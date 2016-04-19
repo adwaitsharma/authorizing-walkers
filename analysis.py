@@ -26,7 +26,6 @@ xyz = ['xa','ya','za']
 def load_file(file_path, act=None, col_names=col_names):
     '''reads file with appropriate header information'''
     dat = pd.read_csv(file_path, 
-        header=0, 
         names=col_names, 
         usecols=['xa','ya','za','act'])
     if act:
@@ -57,8 +56,6 @@ def get_segs(dat):
     return inds
 
 
-#times = 0
-#for fn in data_files[:10]:
 def show_fft(dat):
     #dat = pd.read_csv(fn, header=0, names=col_names)
     #print fn
@@ -199,37 +196,3 @@ def analysis(data_files):
     results = peaks_for_all(data_files)
     plot_peaks(results)
 
-
-if 0:
-    dat = dat.loc[seg_oi[0][0]:seg_oi[0][1]][:]
-    dat = dat.reset_index(drop=True)
-
-    pca = PCA(n_components=2)
-    #pca.fit(dat)
-    pca.fit(dat[['xa','ya','za']])
-    #print "PCA components"
-    #print pd.DataFrame(pca.components_.round(2), columns=dat.columns[1:])
-    #print "Explained Variance"
-    #print pca.explained_variance_ratio_
-    #print "Cumulative explained variance"
-    #csum = np.cumsum(pca.explained_variance_ratio_)
-    #print csum
-    #print
-    print
-
-    dat2 = pca.transform(dat[xyz])
-
-#data_est = pd.DataFrame(pca2.inverse_transform(dat), columns=data.columns)
-
-if 0:
-    n_samp = np.floor(dat.ts[-1:]/.03)
-    ts_ = np.arange(0,n_samp*.03,.03)
-    ham_win = get_window('hamming', 128)
-    print ham_win.shape
-    dat1 = resample(dat[xyz], n_samp, window='hamming')
-    dat1 = pd.DataFrame(dat1, columns=xyz)
-    dat1['ts'] = ts_
-
-    plt.plot(dat.ts, dat.xa)
-    plt.plot(dat1.ts, dat1.xa)
-    plt.show()

@@ -16,7 +16,7 @@ xyz = ['xa','ya','za']
 #
 
 
-def do_fixes():
+def do_fixes(fix):
     for f in fix:
         write_fixed_file(f)
 
@@ -28,7 +28,6 @@ def write_fixed_file(fix):
 
     #read data file
     dat = pd.read_csv(dat_file, 
-        header=0, 
         names=col_names, 
         usecols=['act'])
     
@@ -43,10 +42,13 @@ def write_fixed_file(fix):
         new_ind.extend([act]*n_samp)
 
     # append remainder of original if new_ind is shorter
+    print len(dat.act)
+    print len(new_ind)
     diff = len(dat.act) - len(new_ind)
     if diff > 0:
         print "appending original"
         new_ind.extend(dat.act[-diff:])
+        print len(new_ind)
     else:
         print 'all samples accounted for'
     #print len(dat.act) - len(new_ind)
@@ -68,7 +70,7 @@ def write_fixed_file(fix):
 #dat_file 1
 fix = []
 # 0 is good
-#fix.append([0, []])
+fix.append([0, []])
 
 fix.append([1,
 [[1,  0,  46592],
@@ -99,7 +101,7 @@ fix.append([3,
     [6, 86709, 88764]]])
 
 #index 4 is good
-#fix.append([4,[]])
+fix.append([4,[]])
 
 fix.append([5,
     [[1, 0, 46540],
@@ -165,7 +167,7 @@ fix.append([10,
  [7, 88962, 104448]]])
 
 # 11 is good
-#fix.append([11, []])
+fix.append([11, []])
 
 # off by 1092
 fix.append([12,
