@@ -30,6 +30,11 @@ def load_file(file_path, act=None, col_names=col_names):
         usecols=['xa','ya','za','act'])
     if act:
         dat = dat.loc[dat.act == act]
+    
+    act_file = file_path[:-3]
+    act_dat = pd.read_csv(act_file)
+
+    dat['act'] = act_dat
 
     return dat
 
