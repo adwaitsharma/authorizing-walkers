@@ -127,10 +127,16 @@ def get_spec_peaks(dat, nFFT=128, fs=52, novr=0, nperseg=128):
     return pk1, pk2
 
 def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
-    for i, c in zip(['xa', 'ya', 'za'], ['r','g','b']):
-        p1, p2 = get_spec_peaks(dat[i], nFFT=128, fs=52, novr=0, nperseg=128)
-        plt.scatter(p1,p2, color=c)
-    plt.show()
+
+    if len(dat.shape) > 1:
+        for i, c in zip(['xa', 'ya', 'za'], ['r','g','b']):
+            p1, p2 = get_spec_peaks(dat[i], nFFT=128, fs=52, novr=0, nperseg=128)
+            plt.scatter(p1,p2, color=c)
+        plt.show()
+    else:
+        p1, p2 = get_spec_peaks(dat, nFFT=128, fs=52, novr=0, nperseg=128)
+        plt.scatter(p1,p2, color='b')
+        plt.show()
 
 
 def peaks_for_all(data_files):
