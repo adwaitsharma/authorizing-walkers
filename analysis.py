@@ -35,7 +35,16 @@ def load_file(file_path, act=None, col_names=col_names):
     act_dat = pd.read_csv(act_file, names=['act'])
     dat['act'] = act_dat
 
+    dat['mag'] = signal_magnitude(dat)
+
     return dat
+
+def signal_magnitude(dat):
+    mag = np.sqrt(
+        (dat.xa - dat.xa.mean())**2 +
+        (dat.ya - dat.ya.mean())**2 +
+        (dat.za - dat.za.mean())**2)
+    return mag
 
 
 def activity_segs(dat):
