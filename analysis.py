@@ -31,9 +31,8 @@ def load_file(file_path, act=None, col_names=col_names):
     if act:
         dat = dat.loc[dat.act == act]
     
-    act_file = file_path[:-3]
-    act_dat = pd.read_csv(act_file)
-
+    act_file = file_path[:-4] + '.txt'
+    act_dat = pd.read_csv(act_file, names=['act'])
     dat['act'] = act_dat
 
     return dat
@@ -61,6 +60,16 @@ def get_segs(dat):
     return inds
 
 
+def prepare_data():
+    '''prepare data with train and test
+    each Xy row is a 
+
+    return X_train, y_train, X_test, y_test
+    '''
+    
+    #
+
+
 def show_fft(dat):
     #dat = pd.read_csv(fn, header=0, names=col_names)
     #print fn
@@ -86,6 +95,8 @@ def show_fft(dat):
 
 
 def get_spec_peaks(dat, nFFT=128, novr=0, nperseg=128):
+    '''returns spetrogram peaks for one time series'''
+
     #sp = plt.specgram(dat, NFFT=nFFT, noverlap=novr)
     f,t,Sxx = spectrogram(dat, nfft=nFFT, noverlap=novr, nperseg=nperseg)
     #plt.show()
