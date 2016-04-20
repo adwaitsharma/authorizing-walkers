@@ -116,7 +116,7 @@ def get_spec_peaks(dat, nFFT=128, fs=52, novr=0, nperseg=128):
         p_ind = find_peaks(Sxx[t][:])
         if len(p_ind) >= 2:
             #p1, p2 = (dat.iloc[p_ind[0]], dat.iloc[p_ind[1]])
-            p1, p2 = (Sxx[t][p_ind[0]], Sxx[t][p_ind[1]])
+            p1, p2 = (f[p_ind[0]], f[p_ind[1]])
             pk1.append(p1)
             pk2.append(p2)
     #print pk1
