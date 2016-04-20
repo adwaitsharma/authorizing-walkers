@@ -94,11 +94,11 @@ def show_fft(dat):
     plt.show()
 
 
-def get_spec_peaks(dat, nFFT=128, novr=0, nperseg=128):
+def get_spec_peaks(dat, nFFT=128, fs=52, novr=0, nperseg=128):
     '''returns spetrogram peaks for one time series'''
 
     #sp = plt.specgram(dat, NFFT=nFFT, noverlap=novr)
-    f,t,Sxx = spectrogram(dat, nfft=nFFT, noverlap=novr, nperseg=nperseg)
+    f,t,Sxx = spectrogram(dat, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
     #plt.show()
     pk1 = []
     pk2 = []
@@ -106,7 +106,8 @@ def get_spec_peaks(dat, nFFT=128, novr=0, nperseg=128):
         #p_ind = find_peaks(Sxx[:][t])
         p_ind = find_peaks(Sxx[t][:])
         if len(p_ind) >= 2:
-            p1, p2 = (dat[p_ind[0]], dat[p_ind[1]])
+            #p1, p2 = (dat.iloc[p_ind[0]], dat.iloc[p_ind[1]])
+            p1, p2 = (Sxx[t][p_ind[0]], Sxx[t][p_ind[1]])
             pk1.append(p1)
             pk2.append(p2)
     #print pk1
@@ -115,6 +116,12 @@ def get_spec_peaks(dat, nFFT=128, novr=0, nperseg=128):
     #plt.show()
 
     return pk1, pk2
+
+def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
+    for i, c in zip(['xa', 'ya', 'za'], ['r','g','b']):
+        p1, p2 = get_spec_peaks(dat[i], nFFT=128, fs=52, novr=0, nperseg=128)
+        plt.scatter(p1,p2, color=c)
+    plt.show()
 
 
 def peaks_for_all(data_files):
