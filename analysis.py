@@ -103,7 +103,7 @@ def show_fft(dat):
     plt.show()
 
 
-def get_spec_peaks(dat, nFFT=128, fs=52, novr=0, nperseg=128):
+def get_spec_peaks(dat, n_peaks=8, nFFT=128, fs=52, novr=0, nperseg=128):
     '''returns spetrogram peaks for one time series'''
 
     #sp = plt.specgram(dat, NFFT=nFFT, noverlap=novr)
@@ -111,32 +111,52 @@ def get_spec_peaks(dat, nFFT=128, fs=52, novr=0, nperseg=128):
     #plt.show()
     pk1 = []
     pk2 = []
+    pks = []
     for t in range(Sxx.shape[0]):
         #p_ind = find_peaks(Sxx[:][t])
         p_ind = find_peaks(Sxx[t][:])
+        #print 'p_ind', p_ind
+        #print 'Sxx[x][:]', len(Sxx[t])
         if len(p_ind) >= 2:
             #p1, p2 = (dat.iloc[p_ind[0]], dat.iloc[p_ind[1]])
             p1, p2 = (f[p_ind[0]], f[p_ind[1]])
             pk1.append(p1)
             pk2.append(p2)
+        #print len(p_ind), len(f)
+        
+        cur_peak_inds = p_ind[:n_peaks]
+        #while len(cur_peak_inds) < n_peaks:
+        #    cur_peak_inds.append(0)
+        #    print '.',
+        #print
+        pks.append([f[i] for i in p_ind[:n_peaks]])
+        #print len(pks[-1])
+
     #print pk1
     #print pk2
     #plt.plot(pk1,pk2, '.')
     #plt.show()
 
-    return pk1, pk2
+    #return pk1, pk2
+    pks = np.array(pks)
+    return pks
 
 def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
+    plt.figure()
+    
 
     if len(dat.shape) > 1:
         for i, c in zip(['xa', 'ya', 'za'], ['r','g','b']):
             p1, p2 = get_spec_peaks(dat[i], nFFT=128, fs=52, novr=0, nperseg=128)
             plt.scatter(p1,p2, color=c)
-        plt.show()
+        #plt.show()
     else:
         p1, p2 = get_spec_peaks(dat, nFFT=128, fs=52, novr=0, nperseg=128)
+        mean_p1 = np.mean(p1)
+        mean_p2 = np.mean(p2)
         plt.scatter(p1,p2, color='b')
-        plt.show()
+        plt.plot(mean_p1, mean_p2, 'ro')
+        #plt.show()
 
 
 def peaks_for_all(data_files):
@@ -144,8 +164,9 @@ def peaks_for_all(data_files):
     peak1, peak2, subjn = [], [], []
     for n, fn in enumerate(data_files):
         print os.path.basename(fn)
-        dat = pd.read_csv(fn, header=0, names=col_names)
-        pk1,pk2 = get_spec_peaks(dat.xa)
+        #dat = pd.read_csv(fn, header=0, names=col_names)
+        dat = load_file(fn, act=4)
+        pk1,pk2 = get_spec_peaks(dat.mag)
         subj = [n] * len(pk1)
         peak1.append(pk1)
         peak2.append(pk2)
@@ -228,6 +249,7 @@ def acc_3a(dat):
     plt.plot(ts, dat.za)
     pltsegs(segs)
     plt.show()
+
 
 
 def analysis(data_files):
