@@ -5,8 +5,12 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from scipy.signal import resample
 from scipy.signal import get_window
-from scipy.signal import find_peaks_cwt, spectrogram
+from scipy.signal import spectrogram #, find_peaks_cwt
+from peakdetect import peakdet
 import time
+
+from sklearn.cross_validation import train_test_split
+from sklearn import svm
 
 
 #
@@ -34,6 +38,8 @@ def load_file(file_path, act=None, col_names=col_names):
     act_file = file_path[:-4] + '.txt'
     act_dat = pd.read_csv(act_file, names=['act'])
     dat['act'] = act_dat
+    ts = np.arange(0, dat.shape[0]/52., 1/52.)
+    dat['ts'] = ts
 
     dat['mag'] = signal_magnitude(dat)
 
@@ -69,14 +75,36 @@ def get_segs(dat):
     return inds
 
 
-def prepare_data():
+def prepare_data(data_files, dim='xa', n_peaks=5, test_ratio=.3, 
+    random_state=3):
     '''prepare data with train and test
     each Xy row is a 
 
     return X_train, y_train, X_test, y_test
     '''
-    
-    #
+    #print data_files
+
+    X_train, y_train, X_test, y_test = [], [], [], []
+
+    for i, f in enumerate(data_files):
+        print os.path.basename(f)
+        dat = load_file(f, act=4)
+        X = get_spec_peaks(dat[dim], n_peaks)
+        n_samp = len(X)
+        y = [i+1] * n_samp
+
+        X_train_i, X_test_i, y_train_i, y_test_i = train_test_split(
+            X, y, test_size=test_ratio, random_state=random_state)
+        
+        X_train.extend(X_train_i)
+        X_test.extend(X_test_i)
+        y_train.extend(y_train_i)
+        y_test.extend(y_test_i)
+
+    X_train, y_train = np.array(X_train), np.array(y_train)
+    X_test, y_test = np.array(X_test), np.array(y_test)
+
+    return X_train, y_train, X_test, y_test 
 
 
 def show_fft(dat):
@@ -102,9 +130,19 @@ def show_fft(dat):
     #plt.title(os.path.basename(fn))
     plt.show()
 
+def plt_psd_w_peaks(f,x, delta=10):
+    #p_ind = find_peaks(x)
+    mx, mn = peakdet(x, delta=delta)
+    #print mx
+    #print mn
+    plt.plot(x)
+    for p in mx:
+        plt.plot(p[0], p[1], 'ro')
+    plt.show()
 
 def get_spec_peaks(dat, n_peaks=8, nFFT=128, fs=52, novr=0, nperseg=128):
     '''returns spetrogram peaks for one time series'''
+
 
     #sp = plt.specgram(dat, NFFT=nFFT, noverlap=novr)
     f,t,Sxx = spectrogram(dat, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
@@ -112,9 +150,9 @@ def get_spec_peaks(dat, n_peaks=8, nFFT=128, fs=52, novr=0, nperseg=128):
     pk1 = []
     pk2 = []
     pks = []
-    for t in range(Sxx.shape[0]):
+    for ti in range(t.shape[0]):
         #p_ind = find_peaks(Sxx[:][t])
-        p_ind = find_peaks(Sxx[t][:])
+        p_ind = find_peaks(Sxx[ti][:])
         #print 'p_ind', p_ind
         #print 'Sxx[x][:]', len(Sxx[t])
         if len(p_ind) >= 2:
@@ -131,14 +169,14 @@ def get_spec_peaks(dat, n_peaks=8, nFFT=128, fs=52, novr=0, nperseg=128):
         #print
         pks.append([f[i] for i in p_ind[:n_peaks]])
         #print len(pks[-1])
-
     #print pk1
     #print pk2
     #plt.plot(pk1,pk2, '.')
     #plt.show()
 
     #return pk1, pk2
-    pks = np.array(pks)
+    #pks = np.array(pks)
+    
     return pks
 
 def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
@@ -158,6 +196,43 @@ def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
         plt.plot(mean_p1, mean_p2, 'ro')
         #plt.show()
 
+def get_features(Dat, nFFT=256, n_peaks=3):
+    fs = 52.
+    novr = 0
+    nperseg = nFFT
+    delta = 50
+    #pk1,pk2 = get_spec_peaks(Dat.mag, novr=0)
+
+    # Calculate the spectrogram
+    f,t,Sxx = spectrogram(Dat.mag, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
+    #print 'Sxx.shape', Sxx.shape
+    n_nows = len(t)
+    # get activity labels
+    inds = np.arange(nFFT/2., nFFT*t.shape[0], nFFT)
+    inds = [int(i) for i in inds]
+    acts = [Dat.act[i] for i in inds]
+    #acts.reset_index()
+
+    # initialize for number of peaks to return
+    peaks = np.zeros((len(t), n_peaks))
+    # Find peaks for each time slice
+    for ti in range(t.shape[0]):
+        mx, mn = peakdet(Sxx[:,ti], delta=delta)
+        pk_inds = [i[0] for i in mx]
+        #print pk_inds
+        pk_freqs = [f[i] for i in pk_inds]
+        #print pk_freqs
+        if len(pk_freqs) >= n_peaks:
+            peaks[ti,:] = pk_freqs[:n_peaks]
+        else:
+            peaks[ti,:len(pk_freqs)] = pk_freqs
+
+    # collect in to DataFrame
+    col_names = ['pk'+str(i) for i in range(n_peaks)]
+    feats = pd.DataFrame(peaks, columns=col_names)
+    feats['act'] = acts
+    
+    return feats
 
 def peaks_for_all(data_files):
     '''calculates spectogram peaks for all files'''
@@ -166,7 +241,9 @@ def peaks_for_all(data_files):
         print os.path.basename(fn)
         #dat = pd.read_csv(fn, header=0, names=col_names)
         dat = load_file(fn, act=4)
-        pk1,pk2 = get_spec_peaks(dat.mag)
+        pk1,pk2 = get_spec_peaks(dat.mag, novr=0)
+        #ts1 = np.arange(nFFT/2, nFFT*)
+    
         subj = [n] * len(pk1)
         peak1.append(pk1)
         peak2.append(pk2)
@@ -189,7 +266,7 @@ def plot_peaks(res):
 
 
 def find_peaks(dat):
-    pks = np.arange(1,5)
+    pks = np.arange(1,50)
     p_ind = find_peaks_cwt(dat, pks)
 
     return p_ind
@@ -251,8 +328,64 @@ def acc_3a(dat):
     plt.show()
 
 
+def gather_data(data_files):
+    X = pd.DataFrame()
+    for fn in data_files:
+        print os.path.basename(fn)
+        dat = load_file(fn)
+        d = get_features(dat, nFFT=256, n_peaks=3)
+        d['subj'] = [int(os.path.basename(fn)[:-4])] * len(d)
+        X = X.append(d, ignore_index=True)
 
-def analysis(data_files):
+    return X
+
+def split_data(Dat, test_ratio=0.3, X_coi=[], y_coi='', random_state=3):
+    if X_coi == [] or y_coi == '':
+        print "Specify columns of interest"
+        return 0
+
+    #X = Dat[X_coi]
+    #y = Dat[y_coi]
+    #X_train, X_test, y_train, y_test = train_test_split(
+    #        X, y, test_size=test_ratio, random_state=random_state)
+    
+    X_train, y_train = pd.DataFrame(), pd.DataFrame([], columns=['act'])
+    X_test, y_test = pd.DataFrame(), pd.DataFrame([], columns=['act'])
+
+    for si in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]:
+        for ai in [3,4]:
+            d = Dat[(Dat.subj==si) & (Dat.act==ai)]
+            n_rows = len(d)
+            #print n_rows,
+            n_test = int(n_rows*test_ratio)
+            X_train = X_train.append(d[X_coi][:-n_test])
+            X_test = X_test.append(d[X_coi][-n_test:])
+            y_train = y_train.append(d[y_coi][:-n_test])
+            y_test = y_test.append(d[y_coi][-n_test:])
+            #print len(X_test)
+
+    #return X, y
+    return X_train, y_train, X_test, y_test
+
+
+def plot_all_peaks(data_files):
+    #nFFT = 128
     results = peaks_for_all(data_files)
     plot_peaks(results)
 
+def analysis_first(Dat):
+    # First analysis as sanity check
+    #Dat = gather_data(data_files)
+    Dat = Dat.query('(act == 4) | (act == 3)')
+    X_train, y_train, X_test, y_test = split_data(
+        Dat, X_coi=['pk0', 'pk1', 'pk2'], y_coi=['act'])
+    clf = svm.SVC()
+    clf.fit(X_train, np.ravel(y_train))
+    print clf.score(X_test, y_test)
+
+    return clf
+
+
+def analysis_svm(X_train, y_train, X_test, y_test):
+    clf = svm.SVC()
+    clf.fit(X_train, y_train)
