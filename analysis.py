@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.learning_curve import learning_curve
+from sklearn.metrics import f1_score
 from scipy.signal import resample
 from scipy.signal import get_window
 from scipy.signal import spectrogram #, find_peaks_cwt
@@ -12,6 +13,7 @@ import time
 
 from sklearn.cross_validation import train_test_split
 from sklearn import svm
+from sklearn import tree
 
 
 #
@@ -108,7 +110,7 @@ def prepare_data(data_files, dim='xa', n_peaks=5, test_ratio=.3,
     return X_train, y_train, X_test, y_test 
 
 
-def show_fft(dat):
+def show_fft(dat, nFFT=256):
     #dat = pd.read_csv(fn, header=0, names=col_names)
     #print fn
     #dat[xyz].plot()
@@ -118,7 +120,7 @@ def show_fft(dat):
     #times +=t
     #print avg_ts(dat.ts)
     dt = 1/52.
-    nFFT = 256
+    #nFFT = 256
     #n_samp = np.int(dat.ts[-1:]/dt)
     n_samp = dat.shape[0]
     #ts_ = np.arange(0,n_samp*dt,dt)
@@ -197,7 +199,7 @@ def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
         plt.plot(mean_p1, mean_p2, 'ro')
         #plt.show()
 
-def get_features(Dat, nFFT=256, n_peaks=3):
+def get_spec_features(Dat, sig_comp='mag', nFFT=256, n_peaks=3):
     fs = 52.
     novr = 0
     nperseg = nFFT
@@ -205,7 +207,7 @@ def get_features(Dat, nFFT=256, n_peaks=3):
     #pk1,pk2 = get_spec_peaks(Dat.mag, novr=0)
 
     # Calculate the spectrogram
-    f,t,Sxx = spectrogram(Dat.mag, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
+    f,t,Sxx = spectrogram(Dat[sig_comp], fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
     #print 'Sxx.shape', Sxx.shape
     n_nows = len(t)
     # get activity labels
@@ -234,6 +236,54 @@ def get_features(Dat, nFFT=256, n_peaks=3):
     feats['act'] = acts
     
     return feats
+
+def compute_sig_dx(x):
+    return x
+
+def extract_time_features(x, ts, delta=25):
+    #x = x.as_matrix()
+    ts = ts.as_matrix()
+    diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
+    jrk_sig = x[1:].as_matrix() - x[:-1].as_matrix()
+    print jrk_sig.shape
+    diffs_jrk = calculate_ts_diffs(jrk_sig, ts[1:], delta=int(delta*.75))
+    print len(diffs_acc), len(diffs_jrk)
+
+    return diffs_acc, diffs_jrk
+
+
+def calculate_ts_diffs(x, ts, delta=25):
+    mx, mn = peakdet(x, delta=delta)
+    mx, mn = mx.astype(int), mn.astype(int)
+    if len(mx) > len(mn):
+        mx = mx[:len(mn)]
+    elif len(mn) > len(mx):
+        mn = mn[:len(mx)]
+
+    print len(mx), len(mn)
+    if 0:
+        plt.plot(Dat[sig_comp], 'k')
+        for i in mx:
+            plt.plot(i[0], i[1], 'bo')
+        for i in mn:
+            plt.plot(i[0], i[1], 'ro')
+        plt.show()
+
+    diff_mx = [ts[j[0]]-ts[i[0]] for i,j in zip(mx[:-1], mx[1:])]
+    diff_mn = [ts[j[0]]-ts[i[0]] for i,j in zip(mn[:-1], mn[1:])]
+
+    if mx[0][0] < mn[0][0]:
+        diff_adj = [ts[j[0]]-ts[i[0]] for i,j in zip(mx[1:], mn[1:])]
+    else:
+        diff_adj = [ts[j[0]]-ts[i[0]] for i,j in zip(mn[1:], mx[1:])]
+
+    print len(diff_mx), len(diff_mn), len(diff_adj)
+
+    return [[a,b,c] for a,b,c in zip(diff_mx, diff_mn, diff_adj)]
+
+
+
+
 
 def peaks_for_all(data_files):
     '''calculates spectogram peaks for all files'''
@@ -329,13 +379,14 @@ def acc_3a(dat):
     plt.show()
 
 
-def gather_data(data_files):
+def gather_data(data_files, sig_comp='mag', nfft=256):
     X = pd.DataFrame()
     for fn in data_files:
-        print os.path.basename(fn)
+        #print os.path.basename(fn)
         dat = load_file(fn)
-        d = get_features(dat, nFFT=256, n_peaks=3)
+        d = get_spec_features(dat, sig_comp=sig_comp, nFFT=nfft, n_peaks=3)
         d['subj'] = [int(os.path.basename(fn)[:-4])] * len(d)
+
         X = X.append(d, ignore_index=True)
 
     return X
@@ -386,17 +437,46 @@ def analysis_first(Dat):
         Dat, X_coi=['pk0', 'pk1', 'pk2'], y_coi=['act'])
     clf = svm.SVC()
     clf.fit(X_train, np.ravel(y_train))
-    print clf
+    #print clf
     print clf.score(X_test, y_test)
 
     return clf
 
-def learning_curve(Dat):
-    X, y,_, _= split_data(Dat, test_ratio=0., X_coi=['pk0', 'pk1', 'pk2'], 
-        y_coi=['act'])
+def analysis_by_nfft(data_files, clf):
+    ffts = [128, 192, 256, 384, 512]
+    ffts = [128, 256, 512]
+    xcoi = ['pk0', 'pk1', 'pk2']
+    #clf = svm.SVC()
+
+    results = np.zeros((len(ffts),4))
+    for i, sig in enumerate(['xa', 'ya', 'za', 'mag']):
+        print "Signal", sig
+        for j, fft_ in enumerate(ffts):
+            print "FFT size:", fft_
+            Dat = gather_data(data_files, sig_comp=sig, nfft=fft_)
+            X_train, y_train, X_test, y_test = split_data(Dat, actions=[3,4], 
+                test_ratio=0.1, X_coi=xcoi, y_coi=['act'])
+            y_train = np.ravel(y_train)
+            clf.fit(X_train, y_train)
+            y_pred = clf.predict(X_test)
+            f1 = f1_score(y_pred, y_test, pos_label=4)
+            print "F1 score:", f1
+            results[j][i] = f1
+        print
+
+    return results
+
+
+
+
+def learning_curve_analysis(Dat, acts=[3,4]):
+    #acts = [2,3,4,5]
+    X, y,_, _= split_data(Dat, test_ratio=0., actions=acts,
+        X_coi=['pk0', 'pk1', 'pk2'], 
+        y_coi=['act'])#, 'subj'])
     y = np.ravel(y)
     plot_learning_curve(svm.SVC(), "SVC Learning Curve", X, y, 
-        actions=[1,2,3,4,5,6,7], train_sizes=np.linspace(.1, 1., 10))
+        train_sizes=np.linspace(.1, .5, 5))
     plt.show()
 
 def analysis_svm(X_train, y_train, X_test, y_test):
