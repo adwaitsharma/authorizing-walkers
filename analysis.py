@@ -519,7 +519,7 @@ def analysis_walking_identification(Dat, subjs=[1,2]):
     xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
     # get train/test data
     X_train, y_train, X_test, y_test = split_data(Dat, subjects=subjs, actions=[4], 
-        test_ratio=0., X_coi=xcoi, y_coi=['subj'])
+        test_ratio=0.3, X_coi=xcoi, y_coi=['subj'])
     print len(y_train), len(y_test)
     y_train = np.ravel(y_train)
     y_test = np.ravel(y_test)
