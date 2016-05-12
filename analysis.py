@@ -8,6 +8,7 @@ from sklearn.metrics import f1_score
 from scipy.signal import resample
 from scipy.signal import get_window
 from scipy.signal import spectrogram #, find_peaks_cwt
+from scipy.signal import butter, lfilter
 from peakdetect import peakdet
 import time
 
@@ -76,6 +77,20 @@ def get_segs(dat):
             a = b
             ai = r.Index
     return inds
+
+def filter_signal(x, ts=None, cutoff=5., fs=52., order=6, viz=0):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    xf = lfilter(b, a, x)
+    
+    if viz and ts is not None:
+        #t = np.linspace(0, len(x)/, len(x), endpoint=False)
+        plt.plot(ts, x, 'b-', label='data')
+        plt.plot(ts, xf, 'g-', label='filtered')
+        plt.xlabel('Time (s)')
+        plt.legend()
+        plt.show()
 
 
 def prepare_data(data_files, dim='xa', n_peaks=5, test_ratio=.3, 
@@ -213,6 +228,7 @@ def get_spec_features(Dat, sig_comp='mag', nFFT=256, n_peaks=3):
     # get activity labels
     inds = np.arange(nFFT/2., nFFT*t.shape[0], nFFT)
     inds = [int(i) for i in inds]
+    # TODO: should fix to not depend on processing actions.
     acts = [Dat.act[i] for i in inds]
     #acts.reset_index()
 
@@ -221,6 +237,7 @@ def get_spec_features(Dat, sig_comp='mag', nFFT=256, n_peaks=3):
     # Find peaks for each time slice
     for ti in range(t.shape[0]):
         mx, mn = peakdet(Sxx[:,ti], delta=delta)
+        mx, mn = mx.astype(int), mn.astype(int)
         pk_inds = [i[0] for i in mx]
         #print pk_inds
         pk_freqs = [f[i] for i in pk_inds]
@@ -237,8 +254,28 @@ def get_spec_features(Dat, sig_comp='mag', nFFT=256, n_peaks=3):
     
     return feats
 
-def compute_sig_dx(x):
-    return x
+
+def time_feature_hist(X, nbins=40, lgnd=['diff_mx','diff_mn','diff_adj']):
+    plt.subplot(131)
+    plt.xlabel(lgnd[0])
+    plt.hist([i[0] for i in X], bins=nbins)
+    plt.subplot(132)
+    plt.xlabel(lgnd[1])
+    plt.hist([i[1] for i in X], bins=nbins)
+    plt.subplot(133)
+    plt.xlabel(lgnd[2])
+    plt.hist([i[2] for i in X], bins=nbins)
+    plt.show()
+
+def time_feature_scatter(X):
+    plt.subplot(221)
+    plt.scatter([i[0] for i in X], [i[1] for i in X])
+    plt.subplot(223)
+    plt.scatter([i[0] for i in X], [i[2] for i in X])
+    plt.subplot(224)
+    plt.scatter([i[1] for i in X], [i[2] for i in X])
+    plt.show()
+
 
 def extract_time_features(x, ts, delta=25):
     #x = x.as_matrix()
@@ -379,11 +416,10 @@ def acc_3a(dat):
     plt.show()
 
 
-def gather_data(data_files, sig_comp='mag', nfft=256):
     X = pd.DataFrame()
     for fn in data_files:
         #print os.path.basename(fn)
-        dat = load_file(fn)
+        dat = load_file(fn, act=act)
         d = get_spec_features(dat, sig_comp=sig_comp, nFFT=nfft, n_peaks=3)
         d['subj'] = [int(os.path.basename(fn)[:-4])] * len(d)
 
@@ -403,8 +439,8 @@ def split_data(Dat, actions=[3,4], test_ratio=0.3, X_coi=[], y_coi='',
     #X_train, X_test, y_train, y_test = train_test_split(
     #        X, y, test_size=test_ratio, random_state=random_state)
     
-    X_train, y_train = pd.DataFrame(), pd.DataFrame([], columns=['act'])
-    X_test, y_test = pd.DataFrame(), pd.DataFrame([], columns=['act'])
+    X_train, y_train = pd.DataFrame(), pd.DataFrame([], columns=[y_coi])
+    X_test, y_test = pd.DataFrame(), pd.DataFrame([], columns=[y_coi])
 
     for si in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]:
         for ai in actions:
@@ -466,8 +502,15 @@ def analysis_by_nfft(data_files, clf):
 
     return results
 
+def analysis_walking_identification(Dat):
+    X_train, y_train, X_test, y_test = split_data(Dat, actions=[4], 
+        test_ratio=0.1, X_coi=xcoi, y_coi=['subj'])
+    y_train = np.ravel(y_train)
 
 
+
+    
+    
 
 def learning_curve_analysis(Dat, acts=[3,4]):
     #acts = [2,3,4,5]
@@ -478,6 +521,7 @@ def learning_curve_analysis(Dat, acts=[3,4]):
     plot_learning_curve(svm.SVC(), "SVC Learning Curve", X, y, 
         train_sizes=np.linspace(.1, .5, 5))
     plt.show()
+
 
 def analysis_svm(X_train, y_train, X_test, y_test):
     clf = svm.SVC()
