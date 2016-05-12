@@ -214,42 +214,51 @@ def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
         plt.plot(mean_p1, mean_p2, 'ro')
         #plt.show()
 
-def get_spec_features(Dat, sig_comp='mag', nFFT=256, n_peaks=3):
+def get_spec_features(Dat, sig_comps='mag', nFFT=256, n_peaks=3):
     fs = 52.
     novr = 0
     nperseg = nFFT
     delta = 50
+    if type(sig_comps) is str:
+        sig_comps = [sig_comps]
     #pk1,pk2 = get_spec_peaks(Dat.mag, novr=0)
 
-    # Calculate the spectrogram
-    f,t,Sxx = spectrogram(Dat[sig_comp], fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
-    #print 'Sxx.shape', Sxx.shape
-    n_nows = len(t)
-    # get activity labels
-    inds = np.arange(nFFT/2., nFFT*t.shape[0], nFFT)
-    inds = [int(i) for i in inds]
-    # TODO: should fix to not depend on processing actions.
-    acts = [Dat.act[i] for i in inds]
-    #acts.reset_index()
+    feats = pd.DataFrame()
+    for sig_comp in sig_comps:
+        # Calculate the spectrogram
+        f,t,Sxx = spectrogram(Dat[sig_comp], fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
+        #print 'Sxx.shape', Sxx.shape
+        n_nows = len(t)
+        # get activity labels
+        inds = np.arange(nFFT/2., nFFT*t.shape[0], nFFT)
+        inds = [int(i) for i in inds]
+        # TODO: should fix to not depend on processing actions.
+        acts = [Dat.act[i] for i in inds]
+        #acts.reset_index()
 
-    # initialize for number of peaks to return
-    peaks = np.zeros((len(t), n_peaks))
-    # Find peaks for each time slice
-    for ti in range(t.shape[0]):
-        mx, mn = peakdet(Sxx[:,ti], delta=delta)
-        mx, mn = mx.astype(int), mn.astype(int)
-        pk_inds = [i[0] for i in mx]
-        #print pk_inds
-        pk_freqs = [f[i] for i in pk_inds]
-        #print pk_freqs
-        if len(pk_freqs) >= n_peaks:
-            peaks[ti,:] = pk_freqs[:n_peaks]
-        else:
-            peaks[ti,:len(pk_freqs)] = pk_freqs
+        # initialize for number of peaks to return
+        peaks = np.zeros((len(t), n_peaks))
+        # Find peaks for each time slice
+        for ti in range(t.shape[0]):
+            #print ti
+            mx, mn = peakdet(Sxx[:,ti], delta=delta)
+            mx, mn = mx.astype(int), mn.astype(int)
+            pk_inds = [i[0] for i in mx]
+            #print pk_inds
+            pk_freqs = [f[i] for i in pk_inds]
+            #print pk_freqs
+            if len(pk_freqs) >= n_peaks:
+                peaks[ti,:] = pk_freqs[:n_peaks]
+            else:
+                peaks[ti,:len(pk_freqs)] = pk_freqs
 
-    # collect in to DataFrame
-    col_names = ['pk'+str(i) for i in range(n_peaks)]
-    feats = pd.DataFrame(peaks, columns=col_names)
+        # collect in to DataFrame
+        col_names = [sig_comp+'pk'+str(i) for i in range(n_peaks)]
+        #print len(peaks)
+        for i in range(n_peaks):
+            #feats = pd.DataFrame(peaks, columns=col_names)
+            feats[col_names[i]] = peaks[:,i]
+    #print len(feats), len(acts)
     feats['act'] = acts
     
     return feats
@@ -415,21 +424,23 @@ def acc_3a(dat):
     pltsegs(segs)
     plt.show()
 
-
+def gather_data(data_files, act=None, sig_comps='mag', nfft=256, n_peaks=3):
     X = pd.DataFrame()
     for fn in data_files:
         #print os.path.basename(fn)
         dat = load_file(fn, act=act)
-        d = get_spec_features(dat, sig_comp=sig_comp, nFFT=nfft, n_peaks=3)
+        d = get_spec_features(dat, sig_comps=sig_comps, nFFT=nfft, n_peaks=n_peaks)
         d['subj'] = [int(os.path.basename(fn)[:-4])] * len(d)
 
         X = X.append(d, ignore_index=True)
 
     return X
 
-def split_data(Dat, actions=[3,4], test_ratio=0.3, X_coi=[], y_coi='', 
+def split_data(Dat, subjects=None, actions=[3,4], test_ratio=0.3, X_coi=[], y_coi='', 
     random_state=3):
-
+    
+    if subjects is None:
+        subjects = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
     if X_coi == [] or y_coi == '':
         print "Specify columns of interest"
         return 0
@@ -442,7 +453,7 @@ def split_data(Dat, actions=[3,4], test_ratio=0.3, X_coi=[], y_coi='',
     X_train, y_train = pd.DataFrame(), pd.DataFrame([], columns=[y_coi])
     X_test, y_test = pd.DataFrame(), pd.DataFrame([], columns=[y_coi])
 
-    for si in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]:
+    for si in subjects:
         for ai in actions:
             d = Dat[(Dat.subj==si) & (Dat.act==ai)]
             n_rows = len(d)
@@ -457,7 +468,7 @@ def split_data(Dat, actions=[3,4], test_ratio=0.3, X_coi=[], y_coi='',
             #print len(X_test)
 
     #return X, y
-    return X_train, y_train, X_test, y_test
+    return X_train, y_train.astype(int), X_test, y_test.astype(int)
 
 
 def plot_all_peaks(data_files):
@@ -502,11 +513,33 @@ def analysis_by_nfft(data_files, clf):
 
     return results
 
-def analysis_walking_identification(Dat):
-    X_train, y_train, X_test, y_test = split_data(Dat, actions=[4], 
-        test_ratio=0.1, X_coi=xcoi, y_coi=['subj'])
-    y_train = np.ravel(y_train)
 
+def analysis_walking_identification(Dat, subjs=[1,2]):
+    xcoi = ['pk0', 'pk1', 'pk2']
+    xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
+    # get train/test data
+    X_train, y_train, X_test, y_test = split_data(Dat, subjects=subjs, actions=[4], 
+        test_ratio=0., X_coi=xcoi, y_coi=['subj'])
+    print len(y_train), len(y_test)
+    y_train = np.ravel(y_train)
+    y_test = np.ravel(y_test)
+    #y_train = y_train[y_train!=1]
+
+    # revise y_labels for Leave One Out Analysis?
+    y_train[y_train != 1] = 0
+    y_test[y_test != 1] = 0
+    #print y_train
+    #print y_test
+
+
+    clf = svm.SVC()
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    f1 = f1_score(y_pred, y_test, pos_label=1)
+
+    print "F1 score:", f1
+
+    return clf
 
 
     
