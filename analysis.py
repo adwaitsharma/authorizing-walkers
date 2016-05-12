@@ -4,6 +4,9 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.learning_curve import learning_curve
+from sklearn.cross_validation import cross_val_score
+from sklearn.ensemble import AdaBoostClassifier
+
 from sklearn.metrics import f1_score
 from scipy.signal import resample
 from scipy.signal import get_window
@@ -457,15 +460,15 @@ def split_data(Dat, subjects=None, actions=[3,4], test_ratio=0.3, X_coi=[], y_co
         for ai in actions:
             d = Dat[(Dat.subj==si) & (Dat.act==ai)]
             n_rows = len(d)
-            #print n_rows,
+            print n_rows,
             n_test = int(n_rows*test_ratio)
             n_train = n_rows - n_test
 
             X_train = X_train.append(d[X_coi][:n_train])
-            X_test = X_test.append(d[X_coi][-n_test:])
+            X_test = X_test.append(d[X_coi][n_train:n_rows])
             y_train = y_train.append(d[y_coi][:n_train])
-            y_test = y_test.append(d[y_coi][-n_test:])
-            #print len(X_test)
+            y_test = y_test.append(d[y_coi][n_train:n_rows])
+            print len(X_train), len(X_test)
 
     #return X, y
     return X_train, y_train.astype(int), X_test, y_test.astype(int)
@@ -514,12 +517,12 @@ def analysis_by_nfft(data_files, clf):
     return results
 
 
-def analysis_walking_identification(Dat, subjs=[1,2]):
+def analysis_walking_identification(clf, Dat, subjs=[1,2]):
     xcoi = ['pk0', 'pk1', 'pk2']
     xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
     # get train/test data
     X_train, y_train, X_test, y_test = split_data(Dat, subjects=subjs, actions=[4], 
-        test_ratio=0.3, X_coi=xcoi, y_coi=['subj'])
+        test_ratio=0.0, X_coi=xcoi, y_coi=['subj'])
     print len(y_train), len(y_test)
     y_train = np.ravel(y_train)
     y_test = np.ravel(y_test)
@@ -531,13 +534,15 @@ def analysis_walking_identification(Dat, subjs=[1,2]):
     #print y_train
     #print y_test
 
+    #clf = svm.SVC()
+    #clf.fit(X_train, y_train)
+    #y_pred = clf.predict(X_test)
+    #f1 = f1_score(y_pred, y_test, pos_label=1)
+    #print "F1 score:", f1
 
-    clf = svm.SVC()
     clf.fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
-    f1 = f1_score(y_pred, y_test, pos_label=1)
-
-    print "F1 score:", f1
+    scores = cross_val_score(clf, X_train, y_train)
+    print scores.mean()
 
     return clf
 
