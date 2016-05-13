@@ -70,7 +70,11 @@ def write_fixed_file(fix):
 #dat_file 1
 fix = []
 # 0 is good
-fix.append([0, []])
+fix.append([0, 
+    [[1, 0, 33676],
+    [2, 33677, 34604], 
+    [3, 34605, 38487], 
+    [4, 38850, 65347]]])
 
 fix.append([1,
 [[1,  0,  46592],

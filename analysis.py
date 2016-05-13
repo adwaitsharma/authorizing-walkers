@@ -289,27 +289,64 @@ def time_feature_scatter(X):
     plt.show()
 
 
+def extract_windowed_time_features(x, ts, win_size, delta):
+    win_size_samp = int(win_size/(ts[1]-ts[0]))
+
+    n_wins = len(x)/win_size_samp
+    x = x[:n_wins*win_size_samp]
+    x = x.reshape((n_wins, win_size_samp))
+    print "win shape:", x.shape
+    #print x[0]
+    #print x[1]
+    rslt = np.apply_along_axis(
+        extract_time_stats, 1, x, ts=ts, delta=delta)
+    return rslt
+
+
+
+def extract_time_stats(x, ts, delta=25):
+    """Takes np.array, not pd.DataFrame
+    """
+    diffs_acc, diffs_jrk = extract_time_features(x,ts,delta)
+    diffs_acc, diffs_jrk = np.array(diffs_acc), np.array(diffs_jrk)
+    
+    means_acc = diffs_acc.mean(axis=0)
+    stds_acc = diffs_acc.std(axis=0)
+    means_jrk = diffs_jrk.mean(axis=0)
+    stds_jrk = diffs_jrk.std(axis=0)
+    #print means_acc, stds_acc, means_jrk, stds_jrk
+    #return np.mean(diffs_acc), np.std(diffs_acc), np.mean(diffs_jrk), np.std(diffs_jrk)
+    return np.concatenate((means_acc, stds_acc, means_jrk, stds_jrk))
+
+
 def extract_time_features(x, ts, delta=25):
+    """Takes np.array, not pd.DataFrame
+    """
     #x = x.as_matrix()
-    ts = ts.as_matrix()
+    #ts = ts.as_matrix()
     diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
-    jrk_sig = x[1:].as_matrix() - x[:-1].as_matrix()
-    print jrk_sig.shape
+    #jrk_sig = x[1:].as_matrix() - x[:-1].as_matrix()
+    jrk_sig = x[1:] - x[:-1]
+    #print "jrk shape:", jrk_sig.shape
     diffs_jrk = calculate_ts_diffs(jrk_sig, ts[1:], delta=int(delta*.75))
-    print len(diffs_acc), len(diffs_jrk)
+    #print len(diffs_acc), len(diffs_jrk)
 
     return diffs_acc, diffs_jrk
+    #return np.mean(diffs_acc)
 
 
 def calculate_ts_diffs(x, ts, delta=25):
+    #print "ts_diffs: x.shape:", x.shape
+    #print "delta", delta
     mx, mn = peakdet(x, delta=delta)
+    #print len(mx), len(mn) 
     mx, mn = mx.astype(int), mn.astype(int)
     if len(mx) > len(mn):
         mx = mx[:len(mn)]
     elif len(mn) > len(mx):
         mn = mn[:len(mx)]
 
-    print len(mx), len(mn)
+    #print len(mx), len(mn)
     if 0:
         plt.plot(Dat[sig_comp], 'k')
         for i in mx:
@@ -320,15 +357,21 @@ def calculate_ts_diffs(x, ts, delta=25):
 
     diff_mx = [ts[j[0]]-ts[i[0]] for i,j in zip(mx[:-1], mx[1:])]
     diff_mn = [ts[j[0]]-ts[i[0]] for i,j in zip(mn[:-1], mn[1:])]
-
-    if mx[0][0] < mn[0][0]:
-        diff_adj = [ts[j[0]]-ts[i[0]] for i,j in zip(mx[1:], mn[1:])]
+    diff_adj = [0,0]
+    if len(mx) > 1:
+        if mx[0][0] < mn[0][0]:
+            diff_adj = [ts[j[0]]-ts[i[0]] for i,j in zip(mx[1:], mn[1:])]
+        else:
+            diff_adj = [ts[j[0]]-ts[i[0]] for i,j in zip(mn[1:], mx[1:])]
     else:
-        diff_adj = [ts[j[0]]-ts[i[0]] for i,j in zip(mn[1:], mx[1:])]
+        diff_mx = [0,0,0]
+        diff_mn = [0,0,0]
+        diff_adj = [0,0,0]
 
-    print len(diff_mx), len(diff_mn), len(diff_adj)
-
-    return [[a,b,c] for a,b,c in zip(diff_mx, diff_mn, diff_adj)]
+    #print len(diff_mx), len(diff_mn), len(diff_adj)
+    rslt = [[a,b,c] for a,b,c in zip(diff_mx, diff_mn, diff_adj)]
+    #print "rstl:",rslt
+    return rslt
 
 
 
@@ -396,6 +439,7 @@ def pltsegs(segs, fs=52., yd=[0,1]):
 def spec_3a(dat, segs=None, nFFT=128, novr=0, fs=52.):   
     if segs is None:
         segs = get_segs(dat)
+        print segs
 
     plt.figure(figsize=(20,6))
     plt.subplot(311)
@@ -460,7 +504,7 @@ def split_data(Dat, subjects=None, actions=[3,4], test_ratio=0.3, X_coi=[], y_co
         for ai in actions:
             d = Dat[(Dat.subj==si) & (Dat.act==ai)]
             n_rows = len(d)
-            print n_rows,
+            #print n_rows,
             n_test = int(n_rows*test_ratio)
             n_train = n_rows - n_test
 
@@ -468,7 +512,7 @@ def split_data(Dat, subjects=None, actions=[3,4], test_ratio=0.3, X_coi=[], y_co
             X_test = X_test.append(d[X_coi][n_train:n_rows])
             y_train = y_train.append(d[y_coi][:n_train])
             y_test = y_test.append(d[y_coi][n_train:n_rows])
-            print len(X_train), len(X_test)
+            #print len(X_train), len(X_test)
 
     #return X, y
     return X_train, y_train.astype(int), X_test, y_test.astype(int)
@@ -523,7 +567,7 @@ def analysis_walking_identification(clf, Dat, subjs=[1,2]):
     # get train/test data
     X_train, y_train, X_test, y_test = split_data(Dat, subjects=subjs, actions=[4], 
         test_ratio=0.0, X_coi=xcoi, y_coi=['subj'])
-    print len(y_train), len(y_test)
+    #print len(y_train), len(y_test)
     y_train = np.ravel(y_train)
     y_test = np.ravel(y_test)
     #y_train = y_train[y_train!=1]
