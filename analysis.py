@@ -39,12 +39,13 @@ def load_file(file_path, act=None, col_names=col_names):
     dat = pd.read_csv(file_path, 
         names=col_names, 
         usecols=['xa','ya','za','act'])
-    if act:
-        dat = dat.loc[dat.act == act]
-    
     act_file = file_path[:-4] + '.txt'
     act_dat = pd.read_csv(act_file, names=['act'])
     dat['act'] = act_dat
+    
+    if act:
+        dat = dat.loc[dat.act == act]
+    
     ts = np.arange(0, dat.shape[0]/52., 1/52.)
     dat['ts'] = ts
 
@@ -289,13 +290,40 @@ def time_feature_scatter(X):
     plt.show()
 
 
+def build_time_domain_data(data_files):
+    act_n = 4
+    X, y = np.empty([0,12]), np.empty([0,2])
+    for fn in data_files:
+        subj_n = int(os.path.basename(fn)[:-4])
+        print subj_n,
+        dat = load_file(fn, act=act_n)
+        rslt = extract_windowed_time_features(
+            dat.ya.as_matrix(), dat.ts.as_matrix(), 5, 25)
+        X = np.concatenate((X, rslt), 0)
+        #print rslt.shape
+        #act_col = np.array([[act_n]] * rslt.shape[0])
+        #subj_col = np.array([[subj_n]] * rslt.shape[0])
+        y_cols = np.array([[act_n, subj_n]] * rslt.shape[0])
+        y = np.concatenate((y, y_cols), 0)
+        #print act_col.shape
+        #print subj_col.shape
+        #rslt = np.concatenate((rslt, act_col, subj_col), 1)
+        #print rslt.shape
+        #print result.shape
+        #result = np.concatenate((result, rslt), 0)
+    print ''
+
+    return X, y
+
+
+
 def extract_windowed_time_features(x, ts, win_size, delta):
     win_size_samp = int(win_size/(ts[1]-ts[0]))
 
     n_wins = len(x)/win_size_samp
     x = x[:n_wins*win_size_samp]
     x = x.reshape((n_wins, win_size_samp))
-    print "win shape:", x.shape
+    #print "win shape:", x.shape
     #print x[0]
     #print x[1]
     rslt = np.apply_along_axis(
@@ -310,13 +338,17 @@ def extract_time_stats(x, ts, delta=25):
     diffs_acc, diffs_jrk = extract_time_features(x,ts,delta)
     diffs_acc, diffs_jrk = np.array(diffs_acc), np.array(diffs_jrk)
     
+
     means_acc = diffs_acc.mean(axis=0)
     stds_acc = diffs_acc.std(axis=0)
     means_jrk = diffs_jrk.mean(axis=0)
     stds_jrk = diffs_jrk.std(axis=0)
     #print means_acc, stds_acc, means_jrk, stds_jrk
     #return np.mean(diffs_acc), np.std(diffs_acc), np.mean(diffs_jrk), np.std(diffs_jrk)
-    return np.concatenate((means_acc, stds_acc, means_jrk, stds_jrk))
+    rslt = np.concatenate((means_acc, stds_acc, means_jrk, stds_jrk))
+
+    return rslt
+
 
 
 def extract_time_features(x, ts, delta=25):
@@ -564,35 +596,28 @@ def analysis_by_nfft(data_files, clf):
 def analysis_walking_identification(clf, Dat, subjs=[1,2]):
     xcoi = ['pk0', 'pk1', 'pk2']
     xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
-    # get train/test data
-    X_train, y_train, X_test, y_test = split_data(Dat, subjects=subjs, actions=[4], 
-        test_ratio=0.0, X_coi=xcoi, y_coi=['subj'])
-    #print len(y_train), len(y_test)
-    y_train = np.ravel(y_train)
-    y_test = np.ravel(y_test)
-    #y_train = y_train[y_train!=1]
 
-    # revise y_labels for Leave One Out Analysis?
-    y_train[y_train != 1] = 0
-    y_test[y_test != 1] = 0
-    #print y_train
-    #print y_test
+    for lo in range(1,3):#max(subjs)+1):
+        print 'leave out', lo
+        # get train/test data
+        X, y, _, _ = split_data(Dat, subjects=subjs, actions=[4], 
+            test_ratio=0.0, X_coi=xcoi, y_coi=['subj'])
+        #print len(y_train), len(y_test)
+        y = np.ravel(y)
+        #y_test = np.ravel(y_test)
+        #y = y[y!=1]
 
-    #clf = svm.SVC()
-    #clf.fit(X_train, y_train)
-    #y_pred = clf.predict(X_test)
-    #f1 = f1_score(y_pred, y_test, pos_label=1)
-    #print "F1 score:", f1
+        # revise y_labels for Leave One Out Analysis?
+        y[y != lo] = 0
+        #y_test[y_test != lo] = 0
+        
+        clf.fit(X, y)
+        scores = cross_val_score(clf, X, y, cv=3)
+        print scores.mean()
 
-    clf.fit(X_train, y_train)
-    scores = cross_val_score(clf, X_train, y_train)
-    print scores.mean()
+    #plt.scatter(X[])
+    return X, y
 
-    return clf
-
-
-    
-    
 
 def learning_curve_analysis(Dat, acts=[3,4]):
     #acts = [2,3,4,5]
