@@ -851,7 +851,7 @@ def split_Xy(X, y, subjects=None, actions=None, test_ratio=0.3, random_state=3):
     return X_train, y_train.astype(int), X_test, y_test.astype(int)
 
 
-def analysis_compare_time_freq(data_files):
+def analysis_compare_time_freq(clf, data_files, sig_comp='ya'):
     subj_n = range(1,16)
 
     # load data - everything
@@ -869,7 +869,7 @@ def analysis_compare_time_freq(data_files):
         d = data[data.subj.isin([i])]
 
         f = extract_windowed_time_features(
-            d.ya.as_matrix(), d.ts.as_matrix(), 5, 50)
+            d[sig_comp].as_matrix(), d.ts.as_matrix(), 5, 50)
         #f = pd.DataFrame(f, columns=)
         #print i, f.shape[0]
         subj_col = [i] * f.shape[0]
@@ -888,7 +888,7 @@ def analysis_compare_time_freq(data_files):
     for i in subj_n:
         d = data[data.subj.isin([i])]
 
-        f = extract_spec_features(d.ya.as_matrix(), nFFT=256, n_peaks=3)
+        f = extract_spec_features(d[sig_comp].as_matrix(), nFFT=256, n_peaks=3)
         #f['subj'] = [i] * f.shape[0]
         #feats_freq.append(f)
         subj_col = [i] * f.shape[0]
