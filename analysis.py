@@ -291,11 +291,11 @@ def get_spec_features(Dat, sig_comps='mag', nFFT=256, n_peaks=3):
     return feats
 
 
-def extract_spec_features(x, nFFT=256, n_peaks=3):
+def extract_spec_features(x, nFFT=256, n_peaks=3, delta=50):
     fs = 52.
     novr = 0
     nperseg = nFFT
-    delta = 50
+    #delta = 50
     #if type(sig_comps) is str:
     #    sig_comps = [sig_comps]
     #pk1,pk2 = get_spec_peaks(Dat.mag, novr=0)
@@ -869,7 +869,7 @@ def analysis_compare_time_freq(clf, data_files, sig_comp='ya'):
         d = data[data.subj.isin([i])]
 
         f = extract_windowed_time_features(
-            d[sig_comp].as_matrix(), d.ts.as_matrix(), 5, 50)
+            d[sig_comp].as_matrix(), d.ts.as_matrix(), 2, 50)
         #f = pd.DataFrame(f, columns=)
         #print i, f.shape[0]
         subj_col = [i] * f.shape[0]
@@ -888,7 +888,8 @@ def analysis_compare_time_freq(clf, data_files, sig_comp='ya'):
     for i in subj_n:
         d = data[data.subj.isin([i])]
 
-        f = extract_spec_features(d[sig_comp].as_matrix(), nFFT=256, n_peaks=3)
+        f = extract_spec_features(d[sig_comp].as_matrix(), 
+            nFFT=256, n_peaks=3, delta=3)
         #f['subj'] = [i] * f.shape[0]
         #feats_freq.append(f)
         subj_col = [i] * f.shape[0]
