@@ -53,6 +53,22 @@ def load_file(file_path, act=None, col_names=col_names):
 
     return dat
 
+
+def load_data(data_files, subjs=range(1,16), act=4, col_names=['ya']):
+    subject_number = lambda x: int(os.path.basename(x)[:-4])
+    data_files_selected = [i for i in data_files if subject_number(i) in subjs]
+    
+    data = pd.DataFrame()
+    for i, f in enumerate(data_files_selected):
+        print subject_number(f),
+        d = load_file(f, act=act)
+        subj_col = [subject_number(f)] * d.shape[0]
+        d['subj'] = subj_col
+        data = data.append(d, ignore_index=True)
+
+    return data
+
+
 def signal_magnitude(dat):
     mag = np.sqrt(
         (dat.xa - dat.xa.mean())**2 +
@@ -81,6 +97,7 @@ def get_segs(dat):
             a = b
             ai = r.Index
     return inds
+
 
 def filter_signal(x, ts=None, cutoff=5., fs=52., order=6, viz=0):
     nyq = 0.5 * fs
@@ -152,6 +169,7 @@ def show_fft(dat, nFFT=256):
     #plt.title(os.path.basename(fn))
     plt.show()
 
+
 def plt_psd_w_peaks(f,x, delta=10):
     #p_ind = find_peaks(x)
     mx, mn = peakdet(x, delta=delta)
@@ -159,8 +177,11 @@ def plt_psd_w_peaks(f,x, delta=10):
     #print mn
     plt.plot(x)
     for p in mx:
+        plt.plot(p[0], p[1], 'go')
+    for p in mn:
         plt.plot(p[0], p[1], 'ro')
     plt.show()
+
 
 def get_spec_peaks(dat, n_peaks=8, nFFT=128, fs=52, novr=0, nperseg=128):
     '''returns spetrogram peaks for one time series'''
@@ -201,6 +222,7 @@ def get_spec_peaks(dat, n_peaks=8, nFFT=128, fs=52, novr=0, nperseg=128):
     
     return pks
 
+
 def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
     plt.figure()
     
@@ -217,6 +239,7 @@ def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
         plt.scatter(p1,p2, color='b')
         plt.plot(mean_p1, mean_p2, 'ro')
         #plt.show()
+
 
 def get_spec_features(Dat, sig_comps='mag', nFFT=256, n_peaks=3):
     fs = 52.
@@ -268,6 +291,60 @@ def get_spec_features(Dat, sig_comps='mag', nFFT=256, n_peaks=3):
     return feats
 
 
+def extract_spec_features(x, nFFT=256, n_peaks=3):
+    fs = 52.
+    novr = 0
+    nperseg = nFFT
+    delta = 50
+    #if type(sig_comps) is str:
+    #    sig_comps = [sig_comps]
+    #pk1,pk2 = get_spec_peaks(Dat.mag, novr=0)
+
+    feats = pd.DataFrame()
+    #for sig_comp in sig_comps:
+    # Calculate the spectrogram
+    f,t,Sxx = spectrogram(x, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
+    #print 'Sxx.shape', Sxx.shape
+    n_nows = len(t)
+
+    if 0:
+        # get activity labels
+        inds = np.arange(nFFT/2., nFFT*t.shape[0], nFFT)
+        inds = [int(i) for i in inds]
+        # TODO: should fix to not depend on processing actions.
+        acts = [Dat.act[i] for i in inds]
+        #acts.reset_index()
+
+    # initialize for number of peaks to return
+    peaks = np.zeros((len(t), n_peaks))
+    # Find peaks for each time slice
+    for ti in range(t.shape[0]):
+        #print ti
+        mx, mn = peakdet(Sxx[:,ti], delta=delta)
+        mx, mn = mx.astype(int), mn.astype(int)
+        pk_inds = [i[0] for i in mx]
+        #print pk_inds
+        pk_freqs = [f[i] for i in pk_inds]
+        #print pk_freqs
+        if len(pk_freqs) >= n_peaks:
+            peaks[ti,:] = pk_freqs[:n_peaks]
+        else:
+            peaks[ti,:len(pk_freqs)] = pk_freqs
+
+    # collect in to DataFrame
+    #c_names = [sig_comp+'pk'+str(i) for i in range(n_peaks)]
+    #print len(peaks)
+    #for i in range(n_peaks):
+        #feats = pd.DataFrame(peaks, columns=col_names)
+    #    feats[c_names[i]] = peaks[:,i]
+
+    #print len(feats), len(acts)
+    #feats['act'] = acts
+    
+    #return feats
+    return peaks
+
+
 def time_feature_hist(X, nbins=40, lgnd=['diff_mx','diff_mn','diff_adj']):
     plt.subplot(131)
     plt.xlabel(lgnd[0])
@@ -291,6 +368,7 @@ def time_feature_scatter(X):
 
 
 def build_time_domain_data(data_files):
+    print 'stand alone function'
     act_n = 4
     X, y = np.empty([0,12]), np.empty([0,2])
     for fn in data_files:
@@ -315,7 +393,27 @@ def build_time_domain_data(data_files):
 
     return X, y
 
+def compute_time_domain_data(data, sig_col='ya', window_size=5, delta=25):
+    """not used?"""
+    act_n = 4
+    # there are 12 X features to compute and 2 labels
+    X, y = np.empty([0,12]), np.empty([0,2])
 
+    for s in subj_numbers:
+        #subj_n = int(os.path.basename(fn)[:-4])
+        print s,
+        subj_mask = data.subj.isin([s])
+        dat = data[subj_mask]
+        #dat = load_file(fn, act=act_n)
+        rslt = extract_windowed_time_features(
+            dat[sig_col].as_matrix(), dat.ts.as_matrix(), window_size, delta)
+        X = np.concatenate((X, rslt), 0)
+        
+        y_cols = np.array([[act_n, subj_n]] * rslt.shape[0])
+        y = np.concatenate((y, y_cols), 0)
+    print ''
+
+    return X, y
 
 def extract_windowed_time_features(x, ts, win_size, delta):
     win_size_samp = int(win_size/(ts[1]-ts[0]))
@@ -350,7 +448,6 @@ def extract_time_stats(x, ts, delta=25):
     return rslt
 
 
-
 def extract_time_features(x, ts, delta=25):
     """Takes np.array, not pd.DataFrame
     """
@@ -358,7 +455,8 @@ def extract_time_features(x, ts, delta=25):
     #ts = ts.as_matrix()
     diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
     #jrk_sig = x[1:].as_matrix() - x[:-1].as_matrix()
-    jrk_sig = x[1:] - x[:-1]
+    #jrk_sig = x[1:] - x[:-1]
+    jrk_sig = np.diff(x)
     #print "jrk shape:", jrk_sig.shape
     diffs_jrk = calculate_ts_diffs(jrk_sig, ts[1:], delta=int(delta*.75))
     #print len(diffs_acc), len(diffs_jrk)
@@ -440,7 +538,7 @@ def plot_peaks(res):
 
 
 
-def find_peaks(dat):
+def find_peaks_x(dat):
     pks = np.arange(1,50)
     p_ind = find_peaks_cwt(dat, pks)
 
@@ -504,10 +602,26 @@ def acc_3a(dat):
     plt.show()
 
 def gather_data(data_files, act=None, sig_comps='mag', nfft=256, n_peaks=3):
+    print "should avoid this"
     X = pd.DataFrame()
     for fn in data_files:
         #print os.path.basename(fn)
         dat = load_file(fn, act=act)
+        d = get_spec_features(dat, sig_comps=sig_comps, nFFT=nfft, n_peaks=n_peaks)
+        d['subj'] = [int(os.path.basename(fn)[:-4])] * len(d)
+
+        X = X.append(d, ignore_index=True)
+
+    return X
+
+
+def compute_spec_features(data, act=None, sig_comps='mag', nfft=256, n_peaks=3):
+    print "should avoid this"
+    X = pd.DataFrame()
+    for fn in data_files:
+        #print os.path.basename(fn)
+        subj_mask = data.subj.isin([i])
+        dat = data[subj_mask]
         d = get_spec_features(dat, sig_comps=sig_comps, nFFT=nfft, n_peaks=n_peaks)
         d['subj'] = [int(os.path.basename(fn)[:-4])] * len(d)
 
@@ -594,10 +708,10 @@ def analysis_by_nfft(data_files, clf):
 
 
 def analysis_walking_identification(clf, Dat, subjs=[1,2]):
-    xcoi = ['pk0', 'pk1', 'pk2']
+    #xcoi = ['pk0', 'pk1', 'pk2']
     xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
 
-    for lo in range(1,3):#max(subjs)+1):
+    for lo in range(1,max(subjs)+1):
         print 'leave out', lo
         # get train/test data
         X, y, _, _ = split_data(Dat, subjects=subjs, actions=[4], 
@@ -621,12 +735,14 @@ def analysis_walking_identification(clf, Dat, subjs=[1,2]):
 
 def learning_curve_analysis(Dat, acts=[3,4]):
     #acts = [2,3,4,5]
+    xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
+
     X, y,_, _= split_data(Dat, test_ratio=0., actions=acts,
-        X_coi=['pk0', 'pk1', 'pk2'], 
+        X_coi=xcoi, 
         y_coi=['act'])#, 'subj'])
     y = np.ravel(y)
     plot_learning_curve(svm.SVC(), "SVC Learning Curve", X, y, 
-        train_sizes=np.linspace(.1, .5, 5))
+        train_sizes=np.linspace(.2, 1., 5))
     plt.show()
 
 
@@ -693,3 +809,141 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
 
     plt.legend(loc="best")
     return plt
+
+
+def split_Xy(X, y, subjects=None, actions=None, test_ratio=0.3, random_state=3):
+    
+    y_items = set(y.tolist())
+
+    #if subjects is None:
+    #    subjects = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+    #if X_coi == [] or y_coi == '':
+    #    print "Specify columns of interest"
+    #    return 0
+
+    #X = Dat[X_coi]
+    #y = Dat[y_coi]
+    #X_train, X_test, y_train, y_test = train_test_split(
+    #        X, y, test_size=test_ratio, random_state=random_state)
+    
+    #X_train, y_train = pd.DataFrame(), pd.DataFrame()
+    #X_test, y_test = pd.DataFrame(), pd.DataFrame()
+    X_train, y_train = np.empty([0,X.shape[1]]), np.empty([1,0])
+    X_test, y_test = np.empty([0,X.shape[1]]), np.empty([1,0])
+
+    for yi in y_items:
+        #d = Dat[(y==si)]
+        i_mask = y==yi
+        n_rows = len(y[i_mask])
+        n_test = int(n_rows*test_ratio)
+        n_train = n_rows - n_test
+        #print n_rows,
+        Xi = X[i_mask]
+        yi = y[i_mask]
+        
+        X_train = np.vstack((X_train, Xi[:][:n_train]))
+        X_test = np.vstack((X_test, Xi[:][n_train:n_rows]))
+        y_train = np.append(y_train, yi[:n_train])
+        y_test = np.append(y_test, yi[n_train:n_rows])
+        #print len(X_train), len(X_test)
+
+    #return X, y
+    return X_train, y_train.astype(int), X_test, y_test.astype(int)
+
+
+def analysis_compare_time_freq(data_files):
+    subj_n = range(1,16)
+
+    # load data - everything
+    print "loading data files..."
+    data = load_data(data_files, act=4)
+    print ''
+
+    # time domain features
+    #feats_time = pd.DataFrame()
+    X_time, y_time = np.empty([0,12]), np.empty([1,0])
+
+    print "Extracting time features..."
+    t = time.time()
+    for i in subj_n:
+        d = data[data.subj.isin([i])]
+
+        f = extract_windowed_time_features(
+            d.ya.as_matrix(), d.ts.as_matrix(), 5, 50)
+        #f = pd.DataFrame(f, columns=)
+        #print i, f.shape[0]
+        subj_col = [i] * f.shape[0]
+        #print subj_col
+        #f.subj = subj_col
+        y_time = np.append(y_time, subj_col)
+        X_time = np.vstack((X_time, f))
+        #feats_time.append(f)
+    y_time = y_time.astype(int)
+    print "Time:", time.time() - t
+
+    # frequency domain features
+    print "Extracting frequency features..."
+    t = time.time()
+    X_freq, y_freq = np.empty([0,3]), np.empty([1,0])
+    for i in subj_n:
+        d = data[data.subj.isin([i])]
+
+        f = extract_spec_features(d.ya.as_matrix(), nFFT=256, n_peaks=3)
+        #f['subj'] = [i] * f.shape[0]
+        #feats_freq.append(f)
+        subj_col = [i] * f.shape[0]
+        y_freq = np.append(y_freq, subj_col)
+        X_freq = np.vstack((X_freq, f))
+    y_freq = y_freq.astype(int)
+    print "Time:", time.time() - t
+
+    #return (X_time,y_time), (X_freq, y_freq)
+    lo_time = analysis_classify_walkers(clf, X_time, y_time)
+    lo_freq = analysis_classify_walkers(clf, X_freq, y_freq)
+
+    plt.plot(lo_time, label='Time Features')
+    plt.plot(lo_freq, label='Frequency Features')
+    plt.legend()
+    plt.show()
+
+
+
+
+def analysis_classify_walkers(clf, X, y):
+    #xcoi = ['pk0', 'pk1', 'pk2']
+    #xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
+
+    lo_scores = []
+    for lo in range(1,max(y)+1):
+        #print 'leave out', lo
+        # get train/test data
+        #X, y, _, _ = split_data(Dat, subjects=subjs, actions=[4], 
+        #    test_ratio=0.0, X_coi=xcoi, y_coi=['subj'])
+        #print len(y_train), len(y_test)
+        yi = np.copy(y)
+        
+        # revise y_labels for Leave One Out Analysis?
+        yi[yi != lo] = 0
+        #y_test[y_test != lo] = 0
+        
+        clf.fit(X, yi)
+        scores = cross_val_score(clf, X, yi, cv=3)
+        #print scores.mean()
+        lo_scores.append(scores.mean())
+
+    #plt.scatter(X[])
+    return lo_scores
+
+def plot_as_pca(X):
+    pca = PCA(n_components=2)
+    Xt = pca.fit_transform(X[0])
+
+    for i in range(1,6):
+        print i,
+        Xi = Xt[np.ravel(X[1]==i)]
+        Xc = np.ravel(X[1][np.ravel(X[1]==i)])
+        print Xc
+        print Xi.shape
+        plt.scatter(Xi[:,0], Xi[:,1], c=Xc)#[i]*Xi[0].size)
+    plt.show()
+
