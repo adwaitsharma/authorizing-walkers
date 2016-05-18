@@ -19,6 +19,8 @@ from sklearn.cross_validation import train_test_split
 from sklearn import svm
 from sklearn import tree
 
+from time_series_segmentation import peak_detection
+
 
 #
 # Get started!
@@ -503,7 +505,44 @@ def calculate_ts_diffs(x, ts, delta=25):
     #print "rstl:",rslt
     return rslt
 
+def calculate_ts_amp_diffs(x, delta=25):
+    """Takes a signal and returns:
+     - difference between pairs of consecutive peaks
+     - difference between the value of consecutive upper-side peaks
+     - difference between the value of consecutive lower-side peaks
+     """
+    mx, mn = peakdet(x, delta=delta)
+    mx, mn = mx.astype(int), mn.astype(int)
+    if len(mx) > len(mn):
+        mx = mx[:len(mn)]
+    elif len(mn) > len(mx):
+        mn = mn[:len(mx)]
 
+    if 0:
+        plt.plot(x, 'k')
+        for i in mx:
+            plt.plot(i[0], i[1], 'bo')
+        for i in mn:
+            plt.plot(i[0], i[1], 'ro')
+        plt.show()
+
+
+    diff_mx = [j[1]-i[1] for i,j in zip(mx[:-1], mx[1:])]
+    diff_mn = [j[1]-i[1] for i,j in zip(mn[:-1], mn[1:])]
+    diff_adj = [0,0]
+    if len(mx) > 1:
+        if mx[0][0] < mn[0][0]:
+            diff_adj = [j[1]-i[1] for i,j in zip(mx[1:], mn[1:])]
+        else:
+            diff_adj = [j[1]-i[1] for i,j in zip(mn[1:], mx[1:])]
+    else:
+        diff_mx = [0,0,0]
+        diff_mn = [0,0,0]
+        diff_adj = [0,0,0]
+
+    rslt = [[a,b,c] for a,b,c in zip(diff_mx, diff_mn, diff_adj)]
+    #print "rstl:",rslt
+    return rslt
 
 
 
@@ -889,7 +928,7 @@ def analysis_compare_time_freq(clf, data_files, sig_comp='ya'):
         d = data[data.subj.isin([i])]
 
         f = extract_spec_features(d[sig_comp].as_matrix(), 
-            nFFT=256, n_peaks=3, delta=3)
+            nFFT=1024, n_peaks=3, delta=3)
         #f['subj'] = [i] * f.shape[0]
         #feats_freq.append(f)
         subj_col = [i] * f.shape[0]
