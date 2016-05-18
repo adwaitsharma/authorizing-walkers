@@ -435,7 +435,10 @@ def extract_windowed_time_features(x, ts, win_size, delta):
 def extract_time_stats(x, ts, delta=25):
     """Takes np.array, not pd.DataFrame
     """
-    diffs_acc, diffs_jrk = extract_time_features(x,ts,delta)
+    #diffs_acc, diffs_jrk = extract_time_features(x,ts,delta)
+    diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
+    diffs_jrk = calculate_ts_diffs(np.diff(x), ts[1:], delta=delta*.75)
+
     diffs_acc, diffs_jrk = np.array(diffs_acc), np.array(diffs_jrk)
     
 
@@ -453,6 +456,7 @@ def extract_time_stats(x, ts, delta=25):
 def extract_time_features(x, ts, delta=25):
     """Takes np.array, not pd.DataFrame
     """
+    # DONE: move this functionality to extract_time_stats
     #x = x.as_matrix()
     #ts = ts.as_matrix()
     diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
