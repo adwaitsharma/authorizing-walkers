@@ -429,10 +429,10 @@ def compute_time_domain_data(data, sig_col='ya', window_size=5, delta=25):
 
     return X, y
 
-def extract_windowed_time_features(dat, ts, win_size, delta):
+def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp'):
     #print ts.shape
     X = dat.as_matrix()
-
+    
     win_size_samp = int(win_size/(ts[1]-ts[0]))
     n_wins = X.shape[0]/win_size_samp
 
@@ -445,7 +445,7 @@ def extract_windowed_time_features(dat, ts, win_size, delta):
         x = X[:n_wins*win_size_samp]
         x = x.reshape((n_wins, win_size_samp))
         rslt = np.apply_along_axis(
-            extract_time_stats, 1, x, ts=ts, delta=delta)
+            compute_time_stats, 1, x, ts=ts, delta=delta)
     else:
         rslt = np.empty([n_wins,0])
         for i in range(X.shape[1]):
@@ -459,7 +459,7 @@ def extract_windowed_time_features(dat, ts, win_size, delta):
             #print x[0]
             #print x[1]
             r = np.apply_along_axis(
-                extract_time_stats, 1, x, ts=ts, delta=delta)
+                compute_time_stats, 1, x, ts=ts, delta=delta, typ=typ)
             rslt = np.hstack((rslt, r))
             #print r.shape
 
@@ -470,12 +470,16 @@ def extract_windowed_time_features(dat, ts, win_size, delta):
 
 
 
-def extract_time_stats(x, ts, delta=25):
+def compute_time_stats(x, ts, delta=25, typ='amp'):
     """Takes np.array, not pd.DataFrame
     """
     #diffs_acc, diffs_jrk = extract_time_features(x,ts,delta)
-    diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
-    diffs_jrk = calculate_ts_diffs(np.diff(x), ts[1:], delta=delta*.75)
+    if typ == 'amp':
+        diffs_acc = calculate_ts_amp_diffs(x, delta=delta)
+        diffs_jrk = calculate_ts_amp_diffs(np.diff(x), delta=delta*.75)
+    else:
+        diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
+        diffs_jrk = calculate_ts_diffs(np.diff(x), ts[1:], delta=delta*.75)
 
     diffs_acc, diffs_jrk = np.array(diffs_acc), np.array(diffs_jrk)
     
@@ -491,25 +495,7 @@ def extract_time_stats(x, ts, delta=25):
     return rslt
 
 
-def extract_time_features(x, ts, delta=25):
-    """Takes np.array, not pd.DataFrame
-    """
-    # DONE: move this functionality to extract_time_stats
-    #x = x.as_matrix()
-    #ts = ts.as_matrix()
-    diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
-    #jrk_sig = x[1:].as_matrix() - x[:-1].as_matrix()
-    #jrk_sig = x[1:] - x[:-1]
-    jrk_sig = np.diff(x)
-    #print "jrk shape:", jrk_sig.shape
-    diffs_jrk = calculate_ts_diffs(jrk_sig, ts[1:], delta=int(delta*.75))
-    #print len(diffs_acc), len(diffs_jrk)
-
-    return diffs_acc, diffs_jrk
-    #return np.mean(diffs_acc)
-
-
-def calculate_ts_diffs(x, ts, delta=25):
+def calculate_ts_diffs(x, ts, delta=25, viz=0):
     #print "ts_diffs: x.shape:", x.shape
     #print "delta", delta
     mx, mn = peakdet(x, delta=delta)
@@ -521,12 +507,16 @@ def calculate_ts_diffs(x, ts, delta=25):
         mn = mn[:len(mx)]
 
     #print len(mx), len(mn)
-    if 0:
-        plt.plot(Dat[sig_comp], 'k')
+    if viz:
+        fig = plt.figure(figsize=(8,3))
+        plt.plot(ts,x, 'k')
         for i in mx:
-            plt.plot(i[0], i[1], 'bo')
+            plt.plot(ts[i[0]], i[1], 'bo')
         for i in mn:
-            plt.plot(i[0], i[1], 'ro')
+            plt.plot(ts[i[0]], i[1], 'ro')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Signal Amplitude')
+        fig.tight_layout()
         plt.show()
 
     diff_mx = [ts[j[0]]-ts[i[0]] for i,j in zip(mx[:-1], mx[1:])]
@@ -949,7 +939,8 @@ def analysis_classify_activity(clf, data, sig_comp='ya'):
     activities_list = ['Working at Computer', 'Stairs', 'Standing', 'Walking',
         'Stairs', 'Walking and Talking', 'Talking while Standing']
     act_n = [3,4]
-    act_n = [2,3,4,7]
+    act_n = [1,3,4]
+
     activities = [activities_list[i-1] for i in act_n]
 
     #print data.head()
@@ -960,25 +951,27 @@ def analysis_classify_activity(clf, data, sig_comp='ya'):
         else:#if type(sig_comp) == 'list':
             X, y = np.empty([0,12*len(sig_comp)]), np.empty([1,0])
 
-        print "Extracting time features..."
-        t = time.time()
-        for i in act_n:
-            d = data[data.act.isin([i])]
-            #print d.head()
+            '''print "Extracting time features..."
+            t = time.time()
+            for i in act_n:
+                d = data[data.act.isin([i])]
+                #print d.head()
 
-            f = extract_windowed_time_features(
-                d[sig_comp].as_matrix(), d.ts.as_matrix(), 2, 50)
+                f = extract_windowed_time_features(
+                    d[sig_comp].as_matrix(), d.ts.as_matrix(), 2, 50)
 
-            #f = pd.DataFrame(f, columns=)
-            #print i, f.shape[0]
-            act_col = [i] * f.shape[0]
-            #print subj_col
-            #f.subj = subj_col
-            y = np.append(y, act_col)
-            X = np.vstack((X, f))
-            #feats_time.append(f)
-        y = y.astype(int)
-        print "Time:", time.time() - t
+                #f = pd.DataFrame(f, columns=)
+                #print i, f.shape[0]
+                act_col = [i] * f.shape[0]
+                #print subj_col
+                #f.subj = subj_col
+                y = np.append(y, act_col)
+                X = np.vstack((X, f))
+                #feats_time.append(f)
+            y = y.astype(int)
+            print "Time:", time.time() - t
+            '''
+            X, y = make_time_features(data[data.subj==1], ycol='act', yrng=act_n)
         if type(sig_comp) == 'list':
             print 'pca reduction...'
             pca = PCA(n_components=10)
@@ -1146,7 +1139,7 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=40,
                 nFFT=nFFT, n_peaks=n_peaks, delta=delta)
         
         y_col = pd.DataFrame({'subj': [i] * f.shape[0]})
-        y = np.append(y, y_col)#, ignore_index=True)
+        y = np.append(y, y%_col)#, ignore_index=True)
         X = X.append(f, ignore_index=True)
 
     y = y.astype(int)
@@ -1154,7 +1147,8 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=40,
 
     return X, y
 
-def make_time_features(data, win_size=2, delta=40, yrng=range(1,16), ycol='subj'): 
+def make_time_features(data, win_size=2, delta=40, 
+    yrng=range(1,16), ycol='subj', typ='amp'): 
 
     #subj_n = range(1,16)#[1]
     sig_comps = ['xa', 'ya', 'za']
@@ -1169,7 +1163,7 @@ def make_time_features(data, win_size=2, delta=40, yrng=range(1,16), ycol='subj'
         d = data[data[ycol].isin([i])]
 
         f = extract_windowed_time_features(
-            d[sig_comps], d.ts.as_matrix(), win_size, delta)
+            d[sig_comps], d.ts.as_matrix(), win_size, delta, typ=typ)
         y_col = pd.DataFrame({ycol: [i] * f.shape[0]})
         
         y = np.append(y, y_col) #, ignore_index=True)
@@ -1214,18 +1208,16 @@ def analysis_freq_ada(data):
 def analysis_time_tree(data):
     walking_data = data[data.act==4]
     clf = tree.DecisionTreeClassifier()
-    if 0:
-        X, y = make_time_features(walking_data)
-        
-        print 'Walker Classification.'
-        analysis_classify_walkers(clf, X, y)
-        
-        print 'Leave One User Out.'
-        mn, sd = analysis_classify_walkers_louo(clf, X, y)
-        print 'mean',mn, 'std', sd
-    X, y = make
+    X, y = make_time_features(walking_data)
     
+    print 'Walker Classification.'
+    analysis_classify_walkers(clf, X, y)
     
+    print 'Leave One User Out.'
+    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    print 'mean',mn, 'std', sd
+      
+
 def analysis_freq_tree(data):
     walking_data = data[data.act==4]
     clf = tree.DecisionTreeClassifier()
@@ -1237,6 +1229,7 @@ def analysis_freq_tree(data):
     print 'Leave One User Out.'
     mn, sd = analysis_classify_walkers_louo(clf, X, y)
     print 'mean',mn, 'std', sd
+
 
 def analysis_time_svc(data):
     walking_data = data[data.act==4]
@@ -1264,4 +1257,48 @@ def analysis_freq_svc(data):
     print 'mean',mn, 'std', sd
 
 
+''' activity classification'''
 
+def analysis_activity_time_tree(data):
+    user_data = data[data.subj==4]
+    clf = tree.DecisionTreeClassifier()
+    
+    X, y = make_time_features(user_data, ycol=act, yrng=[2,4,6])
+    
+    print 'Walker Classification.'
+    analysis_classify_walkers(clf, X, y)
+    
+    print 'Leave One User Out.'
+    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    print 'mean',mn, 'std', sd
+
+    X, y = make
+      
+      
+def analysis_activity_freq_tree(data):
+    walking_data = data[data.act==4]
+    clf = tree.DecisionTreeClassifier()
+    X, y = make_freq_features(walking_data)
+
+    print 'Walker Classification.'
+    analysis_classify_walkers(clf, X, y)
+    
+    print 'Leave One User Out.'
+    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    print 'mean',mn, 'std', sd
+
+
+
+
+'''
+Plots
+'''
+
+def time_domain_viz(data_files):
+    subj = [1,5,8]
+    t1,t2 = 520,1040
+
+    dat = load_file(data_files[8], act=4)
+    x = dat.ya[t1:t2]
+    ts = dat.ts[t1:t2].as_matrix()
+    r = calculate_ts_diffs(x, ts, delta=40, viz=1)
