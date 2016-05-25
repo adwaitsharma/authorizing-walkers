@@ -1125,9 +1125,10 @@ def plot_windowed_time_features(data_file, n, sig='ya', win_size=2):
     plt.plot(r)
     plt.show()
 
-def make_freq_features(data, nFFT=256, n_peaks=6, delta=40):
+def make_freq_features(data, nFFT=256, n_peaks=6, delta=40,
+    yrng=range(1,16), ycol='subj'):
 
-    subj_n = range(1,16)#[1]
+    #subj_n = range(1,16)#[1]
     sig_comps = ['xa', 'ya', 'za']
     n_sig = len(sig_comps)
 
@@ -1138,14 +1139,14 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=40):
     #X_freq, y_freq = np.empty([0,n_peaks*n_sig]), np.empty([1,0])
     X = pd.DataFrame()
     y = np.array([])
-    for i in subj_n:
-        dat = data[data.subj.isin([i])]
+    for i in yrng: #subj_n:
+        dat = data[data[ycol].isin([i])]
         
         f = get_spec_features(dat, sig_comps,
                 nFFT=nFFT, n_peaks=n_peaks, delta=delta)
         
-        subj_col = pd.DataFrame({'subj': [i] * f.shape[0]})
-        y = np.append(y,subj_col)#, ignore_index=True)
+        y_col = pd.DataFrame({'subj': [i] * f.shape[0]})
+        y = np.append(y, y_col)#, ignore_index=True)
         X = X.append(f, ignore_index=True)
 
     y = y.astype(int)
@@ -1153,9 +1154,9 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=40):
 
     return X, y
 
-def make_time_features(data, win_size=2, delta=40):
+def make_time_features(data, win_size=2, delta=40, yrng=range(1,16), ycol='subj'): 
 
-    subj_n = range(1,16)#[1]
+    #subj_n = range(1,16)#[1]
     sig_comps = ['xa', 'ya', 'za']
     n_sig = len(sig_comps)
 
@@ -1164,14 +1165,14 @@ def make_time_features(data, win_size=2, delta=40):
     
     print "Extracting time features..."
     t = time.time()
-    for i in subj_n:
-        d = data[data.subj.isin([i])]
+    for i in yrng: #subj_n:
+        d = data[data[ycol].isin([i])]
 
         f = extract_windowed_time_features(
             d[sig_comps], d.ts.as_matrix(), win_size, delta)
-        subj_col = pd.DataFrame({'subj': [i] * f.shape[0]})
+        y_col = pd.DataFrame({ycol: [i] * f.shape[0]})
         
-        y = np.append(y, subj_col) #, ignore_index=True)
+        y = np.append(y, y_col) #, ignore_index=True)
         X = X.append(f, ignore_index=True)
 
     y = y.astype(int)
@@ -1213,14 +1214,16 @@ def analysis_freq_ada(data):
 def analysis_time_tree(data):
     walking_data = data[data.act==4]
     clf = tree.DecisionTreeClassifier()
-    X, y = make_time_features(walking_data)
-    
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
-    
-    print 'Leave One User Out.'
-    mn, sd = analysis_classify_walkers_louo(clf, X, y)
-    print 'mean',mn, 'std', sd
+    if 0:
+        X, y = make_time_features(walking_data)
+        
+        print 'Walker Classification.'
+        analysis_classify_walkers(clf, X, y)
+        
+        print 'Leave One User Out.'
+        mn, sd = analysis_classify_walkers_louo(clf, X, y)
+        print 'mean',mn, 'std', sd
+    X, y = make
     
     
 def analysis_freq_tree(data):
