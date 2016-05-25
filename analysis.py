@@ -1179,6 +1179,11 @@ def make_time_features(data, win_size=2, delta=40):
 
     return X, y
 
+'''
+Analyses
+'''
+
+
 def analysis_time_ada(data):
     walking_data = data[data.act==4]
     clf = AdaBoostClassifier(n_estimators=60)
@@ -1191,7 +1196,7 @@ def analysis_time_ada(data):
     mn, sd = analysis_classify_walkers_louo(clf, X, y)
     print 'mean',mn, 'std', sd
     
-    
+
 def analysis_freq_ada(data):
     walking_data = data[data.act==4]
     clf = AdaBoostClassifier(n_estimators=60)
@@ -1204,6 +1209,56 @@ def analysis_freq_ada(data):
     mn, sd = analysis_classify_walkers_louo(clf, X, y)
     print 'mean',mn, 'std', sd
 
+
+def analysis_time_tree(data):
+    walking_data = data[data.act==4]
+    clf = tree.DecisionTreeClassifier()
+    X, y = make_time_features(walking_data)
+    
+    print 'Walker Classification.'
+    analysis_classify_walkers(clf, X, y)
+    
+    print 'Leave One User Out.'
+    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    print 'mean',mn, 'std', sd
+    
+    
+def analysis_freq_tree(data):
+    walking_data = data[data.act==4]
+    clf = tree.DecisionTreeClassifier()
+    X, y = make_freq_features(walking_data)
+
+    print 'Walker Classification.'
+    analysis_classify_walkers(clf, X, y)
+    
+    print 'Leave One User Out.'
+    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    print 'mean',mn, 'std', sd
+
+def analysis_time_svc(data):
+    walking_data = data[data.act==4]
+    clf = svm.SVC()
+    X, y = make_time_features(walking_data)
+    
+    print 'Walker Classification.'
+    analysis_classify_walkers(clf, X, y)
+    
+    print 'Leave One User Out.'
+    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    print 'mean',mn, 'std', sd
+    
+    
+def analysis_freq_svc(data):
+    walking_data = data[data.act==4]
+    clf = svm.SVC()
+    X, y = make_freq_features(walking_data)
+
+    print 'Walker Classification.'
+    analysis_classify_walkers(clf, X, y)
+    
+    print 'Leave One User Out.'
+    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    print 'mean',mn, 'std', sd
 
 
 
