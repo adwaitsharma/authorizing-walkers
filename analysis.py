@@ -188,24 +188,25 @@ def show_fft(dat, nFFT=256):
     plt.show()
 
 
-def plt_walking_psd(data, sig, nFFT=256, pk_dist=.3, show_peaks=False):
+def plt_walking_psd(data, sig, n_peaks=6, nFFT=256, pk_dist=.3, show_peaks=False):
     plt.figure()
     for si in list(set(data.subj)):
         di = data[data.subj == si]
         di = di[di.act == 4]
         x = di[sig][:]
-        a,b,l = plt.psd(x, nFFT, 52., return_line=True)
+        a,b,l = plt.psd(x, nFFT, 52., color='k', return_line=True)
         # grab data from the plot
         pwr, fq = l[0].get_ydata(), l[0].get_xdata()
-        p = peak_detection(pwr, 6, 0, .02, int(pk_dist*52))
+        p = peak_detection(pwr, n_peaks, 0, .02, int(pk_dist*52))
         #print pwr, fq   
         if show_peaks:
             for pi in p:
                 #print pi
-                plt.plot(fq[pi[0]], pi[1], 'ko')
+                plt.plot(fq[pi[0]], pi[1], 'ro')
 
+    plt.tight_layout()
     plt.show()
-    return pwr, fq
+    #return pwr, fq
 
 def plt_psd_w_peaks(f,x, delta=10):
     #p_ind = find_peaks(x)
@@ -651,7 +652,7 @@ def adj_segs(segs, x):
 
 
 
-def pltsegs(ax, segs, fs=52., yd=[0,1]):
+def pltsegs(ax, segs, fs=52., yd=[0,1], labs=1):
     for i,l in enumerate(segs):
         #xd = [l[1]/fs,l[1]/fs]
         xd = [l[2]/fs, l[2]/fs]
@@ -662,8 +663,8 @@ def pltsegs(ax, segs, fs=52., yd=[0,1]):
 
         y_lims = ax.get_ylim()
         #plt.text(xd[0],yd[1], str(i+1))
-        
-        plt.text(xd[0], y_lims[1], str(l[0]))
+        if labs:
+            plt.text(xd[0], y_lims[1], str(l[0]))
 
 
 def spec_3a(dat, segs=None, nFFT=128, novr=0, fs=52.):   
@@ -687,24 +688,28 @@ def spec_3a(dat, segs=None, nFFT=128, novr=0, fs=52.):
     plt.show()
 
 
-def acc_3a(dat):
-    segs = get_activity_segments(dat)
+def acc_3a(dat, segs=None):
+    #segs = get_activity_segments(dat)
     ns = dat.shape[0] 
     ts = np.linspace(0, ns/52., num=ns)
 
-    plt.figure(figsize=(20,6))
+    plt.figure(figsize=(12,6))
     ax = plt.subplot(311)
     plt.plot(ts, dat.xa, 'k')
-    pltsegs(ax, segs)
+    if segs:
+        pltsegs(ax, segs)
 
     ax = plt.subplot(312)
     plt.plot(ts, dat.ya, 'k')
-    pltsegs(ax, segs)
+    if segs:
+        pltsegs(ax, segs)
     
     ax = plt.subplot(313)
     plt.plot(ts, dat.za, 'k')
-    pltsegs(ax, segs)
+    if segs:
+        pltsegs(ax, segs)
     
+    plt.tight_layout()
     plt.show()
 
 def gather_data(data_files, act=None, sig_comps='mag', nfft=256, n_peaks=3):
@@ -1339,16 +1344,32 @@ def time_domain_viz(data_files):
     ts = dat.ts[t1:t2].as_matrix()
     r = calculate_ts_diffs(x, ts, delta=40, viz=1)
 
+
 def exploratory_visualization(data_files):
     dat = load_file(data_files[0])
     x = dat.ya.as_matrix()
 
-    plt.figure(figsize=(12,6))
+    if 0:
+        plt.figure(figsize=(12,6))
 
-    plt.subplot(2,1,1)
-    plt.plot(dat.ts, dat.ya)
+        ax = plt.subplot(2,1,1)
+        plt.plot(dat.ts, dat.ya, 'k')
+        pltsegs(ax, get_activity_segments(dat))
+        ax.set_xlim([0, dat.ts.max()])
+        plt.ylabel('Amplitude')
 
-    plt.subplot(2,1,2)
-    plt.specgram(dat.ya, Fs=52., NFFT=256, noverlap=0)
+        ax = plt.subplot(2,1,2)
+        plt.specgram(dat.ya, Fs=52., NFFT=256, noverlap=0)
+        pltsegs(ax, get_activity_segments(dat), labs=0)
+        ax.set_ylim([0,26])
+        ax.set_xlim([0, dat.ts.max()])
+        plt.ylabel('Frequency')
+        plt.xlabel('Time (s)')
 
-    plt.show()
+        plt.tight_layout()
+        plt.show()
+
+
+        acc_3a(dat[42640:43160])
+        plt.show()
+
