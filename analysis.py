@@ -95,17 +95,26 @@ def activity_segs(dat):
     return inds
 
 
-def get_segs(dat):
-    inds =[]
-    a = dat.act[0]
-    ai = 0
+def get_activity_segments(dat):
+    '''Takes a pandas DataFrame and returns the row numbers where the "act"(ivity)
+    column changes values as a tuple of:
+    (action number, starting row, ending row)'''
+
+    segment_list = []
+
+    # initial activity
+    ind = 0
+    old_act = dat.act[ind]
+    
+    # itterate through rows with named columns
     for r in dat.itertuples():
-        b = r.act
-        if a != b:
-            inds.append([a, ai, r.Index-1])
-            a = b
-            ai = r.Index
-    return inds
+
+        new_act = r.act
+        if old_act != new_act:
+            segment_list.append((old_act, ind, r.Index-1))
+            old_act = new_act
+            ind = r.Index
+    return segment_list
 
 
 def filter_signal(x, ts=None, cutoff=5., fs=52., order=6, viz=0):
@@ -411,7 +420,11 @@ def compute_time_domain_data(data, sig_col='ya', window_size=5, delta=25):
     """not used?"""
     act_n = 4
     # there are 12 X features to compute and 2 labels
-    X, y = np.empty([0,12]), np.empty([0,2])
+    jrk = 1
+    if jrk:
+        X, y = np.empty([0,12]), np.empty([0,2])
+    else:
+        X, y = np.empty([0,6]), np.empty([0,2])
 
     for s in subj_numbers:
         #subj_n = int(os.path.basename(fn)[:-4])
@@ -429,14 +442,18 @@ def compute_time_domain_data(data, sig_col='ya', window_size=5, delta=25):
 
     return X, y
 
-def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp'):
+def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp', jrk=1):
     #print ts.shape
     X = dat.as_matrix()
     
     win_size_samp = int(win_size/(ts[1]-ts[0]))
     n_wins = X.shape[0]/win_size_samp
 
-    rslt = np.empty([0,12])
+    if jrk:
+        rslt = np.empty([0,12])
+    else:
+        rslt = np.empty([0,6])
+        
     lbl = ['mnAcc', 'sdAcc', 'mnJrk', 'sdJrk']
     lbls = []
 
@@ -455,11 +472,9 @@ def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp'):
         
             x = X[:n_wins*win_size_samp, i]
             x = x.reshape((n_wins, win_size_samp))
-            #print "win shape:", x.shape
-            #print x[0]
-            #print x[1]
+            
             r = np.apply_along_axis(
-                compute_time_stats, 1, x, ts=ts, delta=delta, typ=typ)
+                compute_time_stats, 1, x, ts=ts, delta=delta, typ=typ, jrk=jrk)
             rslt = np.hstack((rslt, r))
             #print r.shape
 
@@ -470,27 +485,37 @@ def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp'):
 
 
 
-def compute_time_stats(x, ts, delta=25, typ='amp'):
+def compute_time_stats(x, ts, delta=25, typ='amp', jrk=1):
     """Takes np.array, not pd.DataFrame
     """
+    jrk = 0
     #diffs_acc, diffs_jrk = extract_time_features(x,ts,delta)
     if typ == 'amp':
         diffs_acc = calculate_ts_amp_diffs(x, delta=delta)
-        diffs_jrk = calculate_ts_amp_diffs(np.diff(x), delta=delta*.75)
+        if jrk:
+            diffs_jrk = calculate_ts_amp_diffs(np.diff(x), delta=delta*.75)
     else:
         diffs_acc = calculate_ts_diffs(x, ts, delta=delta)
-        diffs_jrk = calculate_ts_diffs(np.diff(x), ts[1:], delta=delta*.75)
+        if jrk:
+            diffs_jrk = calculate_ts_diffs(np.diff(x), ts[1:], delta=delta*.75)
 
-    diffs_acc, diffs_jrk = np.array(diffs_acc), np.array(diffs_jrk)
+    diffs_acc = np.array(diffs_acc)
+    if jrk:
+        diffs_jrk = np.array(diffs_jrk)
     
 
     means_acc = diffs_acc.mean(axis=0)
     stds_acc = diffs_acc.std(axis=0)
-    means_jrk = diffs_jrk.mean(axis=0)
-    stds_jrk = diffs_jrk.std(axis=0)
+    if jrk:
+        means_jrk = diffs_jrk.mean(axis=0)
+        stds_jrk = diffs_jrk.std(axis=0)
     #print means_acc, stds_acc, means_jrk, stds_jrk
     #return np.mean(diffs_acc), np.std(diffs_acc), np.mean(diffs_jrk), np.std(diffs_jrk)
-    rslt = np.concatenate((means_acc, stds_acc, means_jrk, stds_jrk))
+    
+    if jrk:
+        rslt = np.concatenate((means_acc, stds_acc, means_jrk, stds_jrk))
+    else:
+        rslt = np.concatenate((means_acc, stds_acc))
 
     return rslt
 
@@ -639,7 +664,7 @@ def pltsegs(segs, fs=52., yd=[0,1]):
 
 def spec_3a(dat, segs=None, nFFT=128, novr=0, fs=52.):   
     if segs is None:
-        segs = get_segs(dat)
+        segs = get_activity_segments(dat)
         print segs
 
     plt.figure(figsize=(20,6))
@@ -656,7 +681,7 @@ def spec_3a(dat, segs=None, nFFT=128, novr=0, fs=52.):
 
 
 def acc_3a(dat):
-    segs = get_segs(dat)
+    segs = get_activity_segments(dat)
     ns = dat.shape[0] 
     ts = np.linspace(0, ns/52., num=ns)
 
@@ -1148,7 +1173,7 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=40,
     return X, y
 
 def make_time_features(data, win_size=2, delta=40, 
-    yrng=range(1,16), ycol='subj', typ='amp'): 
+    yrng=range(1,16), ycol='subj', typ='amp', jrk=1): 
 
     #subj_n = range(1,16)#[1]
     sig_comps = ['xa', 'ya', 'za']
@@ -1163,7 +1188,7 @@ def make_time_features(data, win_size=2, delta=40,
         d = data[data[ycol].isin([i])]
 
         f = extract_windowed_time_features(
-            d[sig_comps], d.ts.as_matrix(), win_size, delta, typ=typ)
+            d[sig_comps], d.ts.as_matrix(), win_size, delta, typ=typ, jrk=jrk)
         y_col = pd.DataFrame({ycol: [i] * f.shape[0]})
         
         y = np.append(y, y_col) #, ignore_index=True)
@@ -1208,7 +1233,8 @@ def analysis_freq_ada(data):
 def analysis_time_tree(data):
     walking_data = data[data.act==4]
     clf = tree.DecisionTreeClassifier()
-    X, y = make_time_features(walking_data)
+    X, y = make_time_features(walking_data, jrk=0)
+    print X.shape
     
     print 'Walker Classification.'
     analysis_classify_walkers(clf, X, y)
@@ -1302,3 +1328,17 @@ def time_domain_viz(data_files):
     x = dat.ya[t1:t2]
     ts = dat.ts[t1:t2].as_matrix()
     r = calculate_ts_diffs(x, ts, delta=40, viz=1)
+
+def exploratory_visualization(data_files):
+    dat = load_file(data_files[0])
+    x = dat.ya.as_matrix()
+
+    plt.figure(figsize=(12,6))
+
+    plt.subplot(2,1,1)
+    plt.plot(dat.ts, dat.ya)
+
+    plt.subplot(2,1,2)
+    plt.specgram(dat.ya, Fs=52., NFFT=256, noverlap=0)
+
+    plt.show()
