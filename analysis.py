@@ -651,32 +651,39 @@ def adj_segs(segs, x):
 
 
 
-def pltsegs(segs, fs=52., yd=[0,1]):
+def pltsegs(ax, segs, fs=52., yd=[0,1]):
     for i,l in enumerate(segs):
         #xd = [l[1]/fs,l[1]/fs]
         xd = [l[2]/fs, l[2]/fs]
         yd = [0,fs/2]
         #print xd
-        plt.plot(xd, yd, linewidth=2)
+        #plt.plot(xd, yd, linewidth=2)
+        plt.axvline(xd[0], linewidth=2)
+
+        y_lims = ax.get_ylim()
         #plt.text(xd[0],yd[1], str(i+1))
-        plt.text(xd[0],yd[1], str(l[0]))
+        
+        plt.text(xd[0], y_lims[1], str(l[0]))
 
 
 def spec_3a(dat, segs=None, nFFT=128, novr=0, fs=52.):   
     if segs is None:
         segs = get_activity_segments(dat)
-        print segs
+        #print segs
 
     plt.figure(figsize=(20,6))
-    plt.subplot(311)
+    ax = plt.subplot(311)
     plt.specgram(dat.xa, Fs=fs, NFFT=nFFT, noverlap=novr)
-    pltsegs(segs)
-    plt.subplot(312)
+    pltsegs(ax, segs)
+    
+    ax = plt.subplot(312)
     plt.specgram(dat.ya, Fs=fs, NFFT=nFFT, noverlap=novr)
-    pltsegs(segs)
-    plt.subplot(313)
+    pltsegs(ax, segs)
+    
+    ax = plt.subplot(313)
     plt.specgram(dat.za, Fs=fs, NFFT=nFFT, noverlap=novr)
-    pltsegs(segs)
+    pltsegs(ax, segs)
+    
     plt.show()
 
 
@@ -686,15 +693,18 @@ def acc_3a(dat):
     ts = np.linspace(0, ns/52., num=ns)
 
     plt.figure(figsize=(20,6))
-    plt.subplot(311)
-    plt.plot(ts, dat.xa)
-    pltsegs(segs)
-    plt.subplot(312)
-    plt.plot(ts, dat.ya)
-    pltsegs(segs)
-    plt.subplot(313)
-    plt.plot(ts, dat.za)
-    pltsegs(segs)
+    ax = plt.subplot(311)
+    plt.plot(ts, dat.xa, 'k')
+    pltsegs(ax, segs)
+
+    ax = plt.subplot(312)
+    plt.plot(ts, dat.ya, 'k')
+    pltsegs(ax, segs)
+    
+    ax = plt.subplot(313)
+    plt.plot(ts, dat.za, 'k')
+    pltsegs(ax, segs)
+    
     plt.show()
 
 def gather_data(data_files, act=None, sig_comps='mag', nfft=256, n_peaks=3):
