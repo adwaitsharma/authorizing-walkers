@@ -2,70 +2,14 @@ import pandas as pd
 import numpy as np
 import os
 
-data_dir = 'C:\Users\Molly Babel\Documents\Martin\Accelerometer\Activity Recognition from Single Chest-Mounted Accelerometer'
+
+data_dir = os.path.realpath('.') +'\data'
 # filenames are 1 to 15
 data_files = [data_dir+os.path.sep+str(i)+'.csv' for i in range(1,16)]
 # column names
 col_names = ['ts','xa','ya','za','act']
 # xyz motion columns
 xyz = ['xa','ya','za']
-
-
-#
-# Helper functions
-#
-
-
-def do_fixes(fix):
-    for f in fix:
-        write_fixed_file(f)
-
-def write_fixed_file(fix):
-    index_num = fix[0]
-    dat_file = data_files[index_num]
-    segs = fix[1]
-    print dat_file
-
-    #read data file
-    dat = pd.read_csv(dat_file, 
-        names=col_names, 
-        usecols=['act'])
-    
-    print 'index_num', index_num
-
-    # create new action vector
-    new_ind = []
-    for s in segs:
-        act,a,b = s
-        #print act,a,b
-        n_samp = b-a
-        new_ind.extend([act]*n_samp)
-
-    # append remainder of original if new_ind is shorter
-    print len(dat.act)
-    print len(new_ind)
-    diff = len(dat.act) - len(new_ind)
-    if diff > 0:
-        print "appending original"
-        new_ind.extend(dat.act[-diff:])
-        print len(new_ind)
-    else:
-        print 'all samples accounted for'
-    #print len(dat.act) - len(new_ind)
-
-
-    new_file = dat_file[:-3]+'txt'
-    print new_file
-    with open(new_file, 'w') as f:
-        for i in new_ind:
-            f.write(str(i)+'\n')
-    print
-
-
-
-
-
-
 
 #dat_file 1
 fix = []
@@ -232,4 +176,62 @@ fix.append([14,
  [3, 88515, 90614],
  [6, 90615, 91614],
  [7, 91615, 103498]]])
+
+
+
+#
+# Helper functions
+#
+
+
+def do_fixes(fix):
+    for f in fix:
+        write_fixed_file(f)
+
+def write_fixed_file(fix):
+    index_num = fix[0]
+    dat_file = data_files[index_num]
+    segs = fix[1]
+    print dat_file
+
+    #read data file
+    dat = pd.read_csv(dat_file, 
+        names=col_names, 
+        usecols=['act'])
+    
+    print 'index_num', index_num
+
+    # create new action vector
+    new_ind = []
+    for s in segs:
+        act,a,b = s
+        #print act,a,b
+        n_samp = b-a
+        new_ind.extend([act]*n_samp)
+
+    # append remainder of original if new_ind is shorter
+    print len(dat.act)
+    print len(new_ind)
+    diff = len(dat.act) - len(new_ind)
+    if diff > 0:
+        print "appending original"
+        new_ind.extend(dat.act[-diff:])
+        print len(new_ind)
+    else:
+        print 'all samples accounted for'
+    #print len(dat.act) - len(new_ind)
+
+
+    new_file = dat_file[:-3]+'txt'
+    print new_file
+    with open(new_file, 'w') as f:
+        for i in new_ind:
+            f.write(str(i)+'\n')
+    print
+
+
+
+if __name__=="__main__":
+    do_fixes(fix)
+
 

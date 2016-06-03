@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.learning_curve import learning_curve
 from sklearn.cross_validation import cross_val_score
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import confusion_matrix
 from sklearn import grid_search
 
@@ -14,7 +12,10 @@ from sklearn.metrics import f1_score
 from scipy.signal import get_window
 from scipy.signal import spectrogram #, find_peaks_cwt
 from scipy.signal import butter, lfilter
-from peakdetect import peakdet
+
+#for peakdet
+from numpy import NaN, Inf, arange, isscalar, asarray, array
+
 import time
 
 from scipy.stats import ttest_ind
@@ -24,6 +25,7 @@ from sklearn import svm
 from sklearn import tree
 
 from time_series_segmentation import peak_detection
+
 
 
 #
@@ -38,6 +40,81 @@ xyz = ['xa','ya','za']
 data_dir = os.path.realpath('.') +'\data'
 # filenames are 1 to 15
 data_files = [data_dir+os.path.sep+str(i)+'.csv' for i in range(1,16)]
+
+
+
+#https://gist.github.com/sixtenbe/1178136#file-peakdetect-py
+def peakdet(v, delta, x = None):
+    """
+    Converted from MATLAB script at http://billauer.co.il/peakdet.html
+    
+    Returns two arrays
+    
+    function [maxtab, mintab]=peakdet(v, delta, x)
+    %PEAKDET Detect peaks in a vector
+    %        [MAXTAB, MINTAB] = PEAKDET(V, DELTA) finds the local
+    %        maxima and minima ("peaks") in the vector V.
+    %        MAXTAB and MINTAB consists of two columns. Column 1
+    %        contains indices in V, and column 2 the found values.
+    %      
+    %        With [MAXTAB, MINTAB] = PEAKDET(V, DELTA, X) the indices
+    %        in MAXTAB and MINTAB are replaced with the corresponding
+    %        X-values.
+    %
+    %        A point is considered a maximum peak if it has the maximal
+    %        value, and was preceded (to the left) by a value lower by
+    %        DELTA.
+    
+    % Eli Billauer, 3.4.05 (Explicitly not copyrighted).
+    % This function is released to the public domain; Any use is allowed.
+    
+    """
+    maxtab = []
+    mintab = []
+       
+    if x is None:
+        x = arange(len(v))
+    
+    v = asarray(v)
+    
+    if len(v) != len(x):
+        sys.exit('Input vectors v and x must have same length')
+    
+    if not isscalar(delta):
+        sys.exit('Input argument delta must be a scalar')
+    
+    if delta <= 0:
+        sys.exit('Input argument delta must be positive')
+    
+    mn, mx = Inf, -Inf
+    mnpos, mxpos = NaN, NaN
+    
+    lookformax = True
+    
+    for i in arange(len(v)):
+        this = v[i]
+        if this > mx:
+            mx = this
+            mxpos = x[i]
+        if this < mn:
+            mn = this
+            mnpos = x[i]
+        
+        if lookformax:
+            if this < mx-delta:
+                maxtab.append((mxpos, mx))
+                mn = this
+                mnpos = x[i]
+                lookformax = False
+        else:
+            if this > mn+delta:
+                mintab.append((mnpos, mn))
+                mx = this
+                mxpos = x[i]
+                lookformax = True
+
+    return array(maxtab), array(mintab)
+
 
 
 #
@@ -1128,20 +1205,6 @@ def analysis_compare_time_freq(clf, data):
     return (X_time, y_time), (X_freq, y_freq)
 
 
-def compare_classifiers(X, y):
-
-    clfs = [#('AdaBoost', AdaBoostClassifier(n_estimators=50)),
-            #('KNN', NearestNeighbors(n_neighbors=3)),
-            ('KMeans', KMeans(n_clusters=2)),
-            ('GMM', GMM(n_components=2))
-        ]
-
-    for name, clf in clfs:
-        print name,':',
-        rslt = analysis_classify_walkers_louo(clf, X, y)
-        print rslt
-
-
 def analysis_classify_walkers(clf, X, y):
     scores = cross_val_score(clf, X, y)
     print scores
@@ -1352,7 +1415,7 @@ def compare_time_freq(data):
     print
     print
 
-    Xt, yt = make_freq_features(datawalk, delta=40)   
+    Xt, yt = make_time_features(datawalk, delta=40)   
     scores_t = analysis_grid_tree(Xt, yt)
 
     print 'T-test comparing validation using time and frequency features'
@@ -1455,7 +1518,6 @@ def exploratory_visualization(data_files):
 
 if __name__=="__main__":
     data = load_data(data_files)
-    #data = data[data.subj < 4]
 
     compare_time_freq(data)
     
