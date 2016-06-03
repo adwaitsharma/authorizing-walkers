@@ -7,17 +7,17 @@ from sklearn.learning_curve import learning_curve
 from sklearn.cross_validation import cross_val_score
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.neighbors import NearestNeighbors
-from sklearn.cluster import KMeans
-from sklearn.mixture import GMM
 from sklearn.metrics import confusion_matrix
+from sklearn import grid_search
 
 from sklearn.metrics import f1_score
-from scipy.signal import resample
 from scipy.signal import get_window
 from scipy.signal import spectrogram #, find_peaks_cwt
 from scipy.signal import butter, lfilter
 from peakdetect import peakdet
 import time
+
+from scipy.stats import ttest_ind
 
 from sklearn.cross_validation import train_test_split
 from sklearn import svm
@@ -34,6 +34,10 @@ from time_series_segmentation import peak_detection
 col_names = ['ts','xa','ya','za','act']
 # xyz motion columns
 xyz = ['xa','ya','za']
+
+data_dir = os.path.realpath('.') +'\data'
+# filenames are 1 to 15
+data_files = [data_dir+os.path.sep+str(i)+'.csv' for i in range(1,16)]
 
 
 #
@@ -188,7 +192,8 @@ def show_fft(dat, nFFT=256):
     plt.show()
 
 
-def plt_walking_psd(data, sig, n_peaks=6, nFFT=256, pk_dist=.3, show_peaks=False):
+#def plt_walking_psd(data, sig, n_peaks=6, nFFT=256, pk_dist=.3, show_peaks=False):
+def plt_walking_psd(data, sig, n_peaks=6, nFFT=256, delta=10, show_peaks=False):
     plt.figure()
     for si in list(set(data.subj)):
         di = data[data.subj == si]
@@ -197,18 +202,26 @@ def plt_walking_psd(data, sig, n_peaks=6, nFFT=256, pk_dist=.3, show_peaks=False
         a,b,l = plt.psd(x, nFFT, 52., color='k', return_line=True)
         # grab data from the plot
         pwr, fq = l[0].get_ydata(), l[0].get_xdata()
-        p = peak_detection(pwr, n_peaks, 0, .02, int(pk_dist*52))
-        #print pwr, fq   
+        #p = peak_detection(pwr, n_peaks, 0, .02, int(pk_dist*52))
+        #print pwr, fq  
+        mx, mn = peakdet(pwr, delta=delta)
+        mx, mn = mx.astype(int), mn.astype(int)
+
+ 
         if show_peaks:
-            for pi in p:
-                #print pi
-                plt.plot(fq[pi[0]], pi[1], 'ro')
+            #for pi in p:
+            #print pi
+            #plt.plot(fq[pi[0]], pi[1], 'ro')
+            for p in mx:
+                plt.plot(fq[p[0]], p[1], 'go')
+            for p in mn:
+                plt.plot(fq[p[0]], p[1], 'ro')
 
     plt.tight_layout()
     plt.show()
     #return pwr, fq
 
-def plt_psd_w_peaks(f,x, delta=10):
+def plt_psd_w_peaks(x, delta=10):
     #p_ind = find_peaks(x)
     mx, mn = peakdet(x, delta=delta)
     #print mx
@@ -297,11 +310,7 @@ def get_spec_features(Dat, sig_comps='mag', nFFT=256, n_peaks=3, delta=50):
         # get activity labels
         inds = np.arange(nFFT/2., nFFT*t.shape[0], nFFT)
         inds = [int(i) for i in inds]
-        # TODO: should fix to not depend on processing actions. 
-        # just remove?
-        #acts = [Dat.act[i] for i in inds]
-        #acts.reset_index()
-
+    
         # initialize for number of peaks to return
         peaks = np.zeros((len(t), n_peaks))
         # Find peaks for each time slice
@@ -332,13 +341,13 @@ def get_spec_features(Dat, sig_comps='mag', nFFT=256, n_peaks=3, delta=50):
 
 def extract_spec_features(x, nFFT=256, n_peaks=3, delta=50):
     fs = 52.
-    novr = 0
+    novr = nFFT/2
     nperseg = nFFT
     #pk1,pk2 = get_spec_peaks(Dat.mag, novr=0)
 
     feats = pd.DataFrame()
     # Calculate the spectrogram
-    f,t,Sxx = spectrogram(x, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
+    f,t,Sxx = spectrogram(x, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nFFT)
     #print 'Sxx.shape', Sxx.shape
     n_nows = len(t)
 
@@ -357,6 +366,7 @@ def extract_spec_features(x, nFFT=256, n_peaks=3, delta=50):
         #print ti
         mx, mn = peakdet(Sxx[:,ti], delta=delta)
         mx, mn = mx.astype(int), mn.astype(int)
+        # only concered with maxima for frequency domain features.
         pk_inds = [i[0] for i in mx]
         #print pk_inds
         pk_freqs = [f[i] for i in pk_inds]
@@ -452,23 +462,30 @@ def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp', jrk=1):
 
     if jrk:
         rslt = np.empty([0,12])
+        lbl = ['AccPkMn', 'AccVlMn', 'AccAjMn', 'AccPkSd', 'AccVlSd', 'AccAjSd',
+            'JrkPkMn', 'JrkVlMn', 'JrkAjMn', 'JrkPkSd', 'JrkVlSd', 'JrkAjSd']
     else:
         rslt = np.empty([0,6])
+        lbl = ['AccPkMn', 'AccVlMn', 'AccAjMn', 'AccPkSd', 'AccVlSd', 'AccAjSd']
         
-    lbl = ['mnAcc', 'sdAcc', 'mnJrk', 'sdJrk']
+    
     lbls = []
 
+    # dat has one signal column
     if len(X.shape) == 1:
         lbls = lbl
         x = X[:n_wins*win_size_samp]
         x = x.reshape((n_wins, win_size_samp))
         rslt = np.apply_along_axis(
             compute_time_stats, 1, x, ts=ts, delta=delta)
+    # dat has multiple signal columns. Compute stats for each
+    # and collect results.
     else:
         rslt = np.empty([n_wins,0])
         for i in range(X.shape[1]):
             #sig = dat.columns[i]
             sig = dat.columns[i]
+            #print sig
             lbls.extend([sig+j for j in lbl])
         
             x = X[:n_wins*win_size_samp, i]
@@ -477,9 +494,11 @@ def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp', jrk=1):
             r = np.apply_along_axis(
                 compute_time_stats, 1, x, ts=ts, delta=delta, typ=typ, jrk=jrk)
             rslt = np.hstack((rslt, r))
+            #print lbls
+            #print '*', rslt.shape
             #print r.shape
 
-    #print lbls
+    #print len(lbls)
     result = pd.DataFrame(rslt)#, columns=lbls)
 
     return result
@@ -489,7 +508,7 @@ def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp', jrk=1):
 def compute_time_stats(x, ts, delta=25, typ='amp', jrk=1):
     """Takes np.array, not pd.DataFrame
     """
-    jrk = 0
+    #jrk = 0
     #diffs_acc, diffs_jrk = extract_time_features(x,ts,delta)
     if typ == 'amp':
         diffs_acc = calculate_ts_amp_diffs(x, delta=delta)
@@ -514,9 +533,12 @@ def compute_time_stats(x, ts, delta=25, typ='amp', jrk=1):
     #return np.mean(diffs_acc), np.std(diffs_acc), np.mean(diffs_jrk), np.std(diffs_jrk)
     
     if jrk:
+        #print means_acc.shape, stds_acc.shape, means_jrk.shape, stds_jrk.shape
         rslt = np.concatenate((means_acc, stds_acc, means_jrk, stds_jrk))
     else:
+        #print means_acc.shape, stds_acc.shape
         rslt = np.concatenate((means_acc, stds_acc))
+
 
     return rslt
 
@@ -563,31 +585,36 @@ def calculate_ts_diffs(x, ts, delta=25, viz=0):
     #print "rstl:",rslt
     return rslt
 
-def calculate_ts_amp_diffs(x, delta=25):
+def calculate_ts_amp_diffs(x, delta=25, viz=0):
     """Takes a signal and returns:
      - difference between pairs of consecutive peaks
      - difference between the value of consecutive upper-side peaks
      - difference between the value of consecutive lower-side peaks
      """
     mx, mn = peakdet(x, delta=delta)
+
     mx, mn = mx.astype(int), mn.astype(int)
     if len(mx) > len(mn):
         mx = mx[:len(mn)]
     elif len(mn) > len(mx):
         mn = mn[:len(mx)]
 
-    if 0:
-        plt.plot(x, 'k')
+    if viz:
+        ts = np.arange(0, x.shape[0]/52., 1/52.)
+        plt.plot(ts, x, 'k')
         for i in mx:
-            plt.plot(i[0], i[1], 'bo')
+            plt.plot(ts[i[0]], i[1], 'bo')
         for i in mn:
-            plt.plot(i[0], i[1], 'ro')
+            plt.plot(ts[i[0]], i[1], 'ro')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Acceleration')
+        plt.tight_layout()
         plt.show()
 
 
     diff_mx = [j[1]-i[1] for i,j in zip(mx[:-1], mx[1:])]
     diff_mn = [j[1]-i[1] for i,j in zip(mn[:-1], mn[1:])]
-    diff_adj = [0,0]
+    
     if len(mx) > 1:
         if mx[0][0] < mn[0][0]:
             diff_adj = [j[1]-i[1] for i,j in zip(mx[1:], mn[1:])]
@@ -696,16 +723,20 @@ def acc_3a(dat, segs=None):
     plt.figure(figsize=(12,6))
     ax = plt.subplot(311)
     plt.plot(ts, dat.xa, 'k')
+    plt.ylabel('Acc_X')
     if segs:
         pltsegs(ax, segs)
 
     ax = plt.subplot(312)
     plt.plot(ts, dat.ya, 'k')
+    plt.ylabel('Acc_Y')
     if segs:
         pltsegs(ax, segs)
     
     ax = plt.subplot(313)
     plt.plot(ts, dat.za, 'k')
+    plt.ylabel('Acc_Z')
+    plt.xlabel('Time (s)')
     if segs:
         pltsegs(ax, segs)
     
@@ -1115,32 +1146,37 @@ def analysis_classify_walkers(clf, X, y):
     scores = cross_val_score(clf, X, y)
     print scores
 
-def analysis_classify_walkers_louo(clf, X, y):
-    #xcoi = ['pk0', 'pk1', 'pk2']
-    #xcoi = [i for i in Dat.columns if i not in ['act', 'subj']]
 
+def analysis_classify_walkers_louo(clf, X, y, parms={}):
+    # list of scores for each iteration of user verification
     lo_scores = []
+
     for lo in range(1,max(y)+1):
-        #print 'leave out', lo
+        # revise y_labels for Leave One Out Analysis
         yi = np.copy(y)
-        
-        # revise y_labels for Leave One Out Analysis?
         yi[yi != lo] = 0
-        #y_test[y_test != lo] = 0
-        
-        clf.fit(X, yi)
-        scores = cross_val_score(clf, X, yi, cv=3)
-        #print scores.mean()
-        lo_scores.append(scores.mean())
+        yi[yi == lo] = 1
 
-    #plt.scatter(X[])
+        # make train/test sets
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, yi, test_size=.3, random_state=3)
+        clf.set_params(**parms)
+
+        # fit classifier and score classifier
+        clf.fit(X_train, y_train)
+        score = clf.score(X_test, y_test)
+        lo_scores.append(score)
+    
     scores = np.array(lo_scores)
-    return scores.mean(), scores.std()
+    return scores #.mean(), scores.std()
 
 
-def plot_as_pca(X):
+def plot_as_pca(X): #(X,y)
     pca = PCA(n_components=2)
     Xt = pca.fit_transform(X[0])
+    import six 
+    from matplotlib import colors
+    colors_ = list(six.iteritems(colors.cnames))
 
     for i in range(1,6):
         print i,
@@ -1148,7 +1184,9 @@ def plot_as_pca(X):
         Xc = np.ravel(X[1][np.ravel(X[1]==i)])
         print Xc
         print Xi.shape
-        plt.scatter(Xi[:,0], Xi[:,1], c=Xc)#[i]*Xi[0].size)
+        #plt.scatter(Xi[:,0], Xi[:,1], c=Xc)#[i]*Xi[0].size)
+        plt.scatter(Xi[:,0], Xi[:,1], c=colors_[i])#[i]*Xi[0].size)
+
     plt.show()
 
 def plot_windowed_time_features(data_file, n, sig='ya', win_size=2):
@@ -1158,7 +1196,7 @@ def plot_windowed_time_features(data_file, n, sig='ya', win_size=2):
     plt.plot(r)
     plt.show()
 
-def make_freq_features(data, nFFT=256, n_peaks=6, delta=40,
+def make_freq_features(data, nFFT=256, n_peaks=6, delta=4,
     yrng=range(1,16), ycol='subj'):
 
     #subj_n = range(1,16)#[1]
@@ -1172,22 +1210,23 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=40,
     #X_freq, y_freq = np.empty([0,n_peaks*n_sig]), np.empty([1,0])
     X = pd.DataFrame()
     y = np.array([])
-    for i in yrng: #subj_n:
+    for i in yrng: 
         dat = data[data[ycol].isin([i])]
         
         f = get_spec_features(dat, sig_comps,
                 nFFT=nFFT, n_peaks=n_peaks, delta=delta)
         
         y_col = pd.DataFrame({'subj': [i] * f.shape[0]})
-        y = np.append(y, y%_col)#, ignore_index=True)
+        y = np.append(y, y_col)#, ignore_index=True)
         X = X.append(f, ignore_index=True)
 
     y = y.astype(int)
     print "Time:", time.time() - t
+    print 'Feature Matrix:', X.shape[0], 'rows,', X.shape[1], 'columns.'
 
     return X, y
 
-def make_time_features(data, win_size=2, delta=40, 
+def make_time_features(data, win_size=5, delta=40, 
     yrng=range(1,16), ycol='subj', typ='amp', jrk=1): 
 
     #subj_n = range(1,16)#[1]
@@ -1212,52 +1251,114 @@ def make_time_features(data, win_size=2, delta=40,
     y = y.astype(int)
     print "Time:", time.time() - t
 
+    print 'Feature Matrix:', X.shape[0], 'rows,', X.shape[1], 'columns.'
+
     return X, y
 
 '''
 Analyses
 '''
 
-
-def analysis_time_ada(data):
+def analysis_tree_win_size(data):
     walking_data = data[data.act==4]
-    clf = AdaBoostClassifier(n_estimators=60)
-    X, y = make_time_features(walking_data)
     
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
-    
-    print 'Leave One User Out.'
-    mn, sd = analysis_classify_walkers_louo(clf, X, y)
-    print 'mean',mn, 'std', sd
-    
-
-def analysis_freq_ada(data):
-    walking_data = data[data.act==4]
-    clf = AdaBoostClassifier(n_estimators=60)
-    X, y = make_freq_features(walking_data)
-
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
-    
-    print 'Leave One User Out.'
-    mn, sd = analysis_classify_walkers_louo(clf, X, y)
-    print 'mean',mn, 'std', sd
+    for ws in [3,4,5,6,7,10]:
+        print 'Window Size:', ws
+        X, y = make_time_features(walking_data, win_size=ws, jrk=1)
+        print X.shape
+        clf = tree.DecisionTreeClassifier()
+        
+        print 'Walker Classification.'
+        analysis_classify_walkers(clf, X, y)
+        
+        print 'Leave One User Out.'
+        mn, sd = analysis_classify_walkers_louo(clf, X, y)
+        print 'mean',mn, 'std', sd
+        print
+        print
 
 
-def analysis_time_tree(data):
-    walking_data = data[data.act==4]
-    clf = tree.DecisionTreeClassifier()
-    X, y = make_time_features(walking_data, jrk=0)
+
+def analysis_tree(X,y):
+    clf = tree.DecisionTreeClassifier(min_samples_leaf=10)
     print X.shape
     
     print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
+
+    #analysis_classify_walkers(clf, X, y)
+    #scores = cross_val_score(clf, X, y)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=.3, random_state=3)
+    clf.fit(X_train, y_train)
+    score = clf.score(X_test, y_test)
+    print score
+    print clf
     
-    print 'Leave One User Out.'
-    mn, sd = analysis_classify_walkers_louo(clf, X, y)
-    print 'mean',mn, 'std', sd
-      
+    #print
+    #print 'Leave One User Out.'
+    #mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    #print 'mean',mn, 'std', sd
+    
+
+
+    return clf
+
+
+def analysis_grid_tree(X, y):
+
+    yi = np.copy(y)
+     
+    # revise y_labels for Leave One Out Analysis?
+    yi[yi != 1] = 0
+    #y_test[y_test != lo] = 0
+    clf = tree.DecisionTreeClassifier()#min_samples_leaf=10, min_samples_split=20)#, max_features=4)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, yi, train_size=.3, random_state=3)
+    clf.fit(X_train, y_train)
+    score = clf.score(X_test, y_test)
+    print 'Initial Classifier score:', score
+
+    print 'untuned louo'
+    scores = analysis_classify_walkers_louo(clf, X, y)
+    print scores.mean(), scores.std()
+
+    parameters = {
+        'max_features':[2,4,6,8,12,16],
+        'max_depth':[2,4,6,8],
+        'min_samples_leaf':[5,10,15,20],
+        'min_samples_split':[5,10,15,20]}
+    grid = grid_search.GridSearchCV(clf, parameters)
+    grid.fit(X, yi)
+
+
+    print 'grid search'
+    print grid.best_score_
+    print grid.best_estimator_
+
+    
+
+    print
+    print 'tuned louo'
+    scores = analysis_classify_walkers_louo(clf, X, y, parms=grid.best_params_)
+    print scores.mean(), scores.std()
+
+    return scores
+
+def compare_time_freq(data):
+    datawalk = data[data.act==4]
+    Xf, yf = make_freq_features(datawalk, delta=4)
+    scores_f = analysis_grid_tree(Xf, yf)
+
+    print
+    print
+
+    Xt, yt = make_freq_features(datawalk, delta=40)   
+    scores_t = analysis_grid_tree(Xt, yt)
+
+    print 'T-test comparing validation using time and frequency features'
+    print ttest_ind(scores_f, scores_t)
+    return scores_f, scores_t 
+
 
 def analysis_freq_tree(data):
     walking_data = data[data.act==4]
@@ -1268,34 +1369,11 @@ def analysis_freq_tree(data):
     analysis_classify_walkers(clf, X, y)
     
     print 'Leave One User Out.'
-    mn, sd = analysis_classify_walkers_louo(clf, X, y)
+    scores = analysis_classify_walkers_louo(clf, X, y)
     print 'mean',mn, 'std', sd
 
 
-def analysis_time_svc(data):
-    walking_data = data[data.act==4]
-    clf = svm.SVC()
-    X, y = make_time_features(walking_data)
-    
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
-    
-    print 'Leave One User Out.'
-    mn, sd = analysis_classify_walkers_louo(clf, X, y)
-    print 'mean',mn, 'std', sd
-    
-    
-def analysis_freq_svc(data):
-    walking_data = data[data.act==4]
-    clf = svm.SVC()
-    X, y = make_freq_features(walking_data)
 
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
-    
-    print 'Leave One User Out.'
-    mn, sd = analysis_classify_walkers_louo(clf, X, y)
-    print 'mean',mn, 'std', sd
 
 
 ''' activity classification'''
@@ -1346,21 +1424,23 @@ def time_domain_viz(data_files):
 
 
 def exploratory_visualization(data_files):
-    dat = load_file(data_files[0])
-    x = dat.ya.as_matrix()
+    dat = load_file(data_files[0], act=4)
+    dat.ts = dat.ts-min(dat.ts)
+    #x = data.ya.as_matrix()
 
     if 0:
+        #dat = data[data.act==4]
         plt.figure(figsize=(12,6))
 
         ax = plt.subplot(2,1,1)
         plt.plot(dat.ts, dat.ya, 'k')
-        pltsegs(ax, get_activity_segments(dat))
+        #pltsegs(ax, get_activity_segments(dat))
         ax.set_xlim([0, dat.ts.max()])
         plt.ylabel('Amplitude')
 
         ax = plt.subplot(2,1,2)
-        plt.specgram(dat.ya, Fs=52., NFFT=256, noverlap=0)
-        pltsegs(ax, get_activity_segments(dat), labs=0)
+        plt.specgram(dat.ya, Fs=52., NFFT=256, noverlap=None)
+        #pltsegs(ax, get_activity_segments(dat), labs=0)
         ax.set_ylim([0,26])
         ax.set_xlim([0, dat.ts.max()])
         plt.ylabel('Frequency')
@@ -1370,6 +1450,14 @@ def exploratory_visualization(data_files):
         plt.show()
 
 
-        acc_3a(dat[42640:43160])
-        plt.show()
+    acc_3a(dat[2000:2520])
+    plt.show()
+
+if __name__=="__main__":
+    data = load_data(data_files)
+    #data = data[data.subj < 4]
+
+    compare_time_freq(data)
+    
+
 
