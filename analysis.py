@@ -25,7 +25,8 @@ from sklearn import svm
 from sklearn import tree
 
 from time_series_segmentation import peak_detection
-
+import itertools
+from sklearn.linear_model import LogisticRegression
 
 
 #
@@ -971,7 +972,8 @@ def analysis_svm(X_train, y_train, X_test, y_test):
 
 
 def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
-                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):#[50,100,150,200,300,400]) 
+
     """
     Generate a simple plot of the test and traning learning curve.
 
@@ -1002,6 +1004,7 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
     n_jobs : integer, optional
         Number of jobs to run in parallel (default 1).
     """
+    print estimator
     plt.figure()
     plt.title(title)
     if ylim is not None:
@@ -1010,6 +1013,7 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
     plt.ylabel("Score")
     train_sizes, train_scores, test_scores = learning_curve(
         estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
+    
     train_scores_mean = np.mean(train_scores, axis=1)
     train_scores_std = np.std(train_scores, axis=1)
     test_scores_mean = np.mean(test_scores, axis=1)
@@ -1177,7 +1181,6 @@ def analysis_compare_time_freq(clf, data):
         plt.figure()
         plt.title('PCA time features')
         plt.plot(np.cumsum(pca_time.explained_variance_ratio_))
-        lo_time = analysis_classify_walkers(clf, X_time, y_time)
 
     X_freq, y_freq = make_freq_features(data, nFFT=256, n_peaks=5, delta=50)
 
@@ -1193,7 +1196,6 @@ def analysis_compare_time_freq(clf, data):
     
     #return (X_time,y_time), (X_freq, y_freq)
     
-    lo_freq = analysis_classify_walkers(clf, X_freq, y_freq)
 
     if 0:
         plt.figure()
@@ -1202,16 +1204,15 @@ def analysis_compare_time_freq(clf, data):
         plt.legend()
         plt.show()
 
-    return (X_time, y_time), (X_freq, y_freq)
+    #return (X_time, y_time), (X_freq, y_freq)
+    return (X_freq, y_freq)
 
 
-def analysis_classify_walkers(clf, X, y):
-    scores = cross_val_score(clf, X, y)
-    print scores
 
 
 def analysis_classify_walkers_louo(clf, X, y, parms={}):
     # list of scores for each iteration of user verification
+    print 'LOUO'
     lo_scores = []
 
     for lo in range(1,max(y)+1):
@@ -1219,16 +1220,20 @@ def analysis_classify_walkers_louo(clf, X, y, parms={}):
         yi = np.copy(y)
         yi[yi != lo] = 0
         yi[yi == lo] = 1
-
+        #print yi.mean()
         # make train/test sets
         X_train, X_test, y_train, y_test = train_test_split(
-            X, yi, test_size=.3, random_state=3)
+            X, yi, train_size=.7, random_state=3)
         clf.set_params(**parms)
+        #print y_train.mean(), y_test.mean()
 
         # fit classifier and score classifier
         clf.fit(X_train, y_train)
         score = clf.score(X_test, y_test)
         lo_scores.append(score)
+    print clf
+    print 'train:', X_train.shape
+    print 'test:', X_test.shape
     
     scores = np.array(lo_scores)
     return scores #.mean(), scores.std()
@@ -1289,6 +1294,7 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=4,
 
     return X, y
 
+
 def make_time_features(data, win_size=5, delta=40, 
     yrng=range(1,16), ycol='subj', typ='amp', jrk=1): 
 
@@ -1322,6 +1328,36 @@ def make_time_features(data, win_size=5, delta=40,
 Analyses
 '''
 
+def analysis_logistic_regression(data):
+
+    walking_data = data[data.act==4]
+    #walking_data.reset_index(inplace=True)
+    
+    #X1 = X[:]
+    scores = []
+    for a in range(1,15):
+        
+        #dat = walking_data[walking_data.subj in [a,b]]
+        X, y = make_freq_features(walking_data, delta=4)
+        yi = np.copy(y)
+        yi[yi != a] = 0
+        Xi = X.iloc[:, 1:2]
+        print Xi.shape
+        #yi[yi == a+1] = 1
+
+
+        X_train, X_test, y_train, y_test = train_test_split(Xi, yi, 
+            train_size=.1, random_state=3)
+        clf = LogisticRegression()
+        
+        clf.fit(X_train, y_train)
+        score = clf.score(X_test, y_test)
+        print score
+        scores.append(score)
+    print np.mean(scores)
+    Xy = pd.DataFrame([Xi, yi])
+
+
 def analysis_tree_win_size(data):
     walking_data = data[data.act==4]
     
@@ -1331,8 +1367,6 @@ def analysis_tree_win_size(data):
         print X.shape
         clf = tree.DecisionTreeClassifier()
         
-        print 'Walker Classification.'
-        analysis_classify_walkers(clf, X, y)
         
         print 'Leave One User Out.'
         mn, sd = analysis_classify_walkers_louo(clf, X, y)
@@ -1346,9 +1380,6 @@ def analysis_tree(X,y):
     clf = tree.DecisionTreeClassifier(min_samples_leaf=10)
     print X.shape
     
-    print 'Walker Classification.'
-
-    #analysis_classify_walkers(clf, X, y)
     #scores = cross_val_score(clf, X, y)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=.3, random_state=3)
@@ -1366,30 +1397,52 @@ def analysis_tree(X,y):
 
     return clf
 
+def run_analyses(X, y):
+    clf = tree.DecisionTreeClassifier(class_weight='balanced')#min_samples_leaf=10, min_samples_split=20)#, max_features=4)
+    parameters = {
+        'max_features':[3,4,5],
+        #'max_depth':[None, 2,3,4],
+        'min_samples_leaf':[1,2,3,4,5,10],
+        'min_samples_split':[2,3,4,5,10,15,20]}
 
-def analysis_grid_tree(X, y):
+    #analysis_grid_tree(clf, parameters, X, y)
+
+    clf = svm.SVC(class_weight='balanced')
+    parameters = {
+        'C': [1, 10, 100, 1000], 
+        'gamma': [.1,.01, 0.001, 0.0001]}
+    clf = analysis_grid_tree(clf, parameters, X, y)
+
+    return clf
+
+
+
+def analysis_grid_tree(clf, parameters, X, y):
+    """
+    """
+    print 'data:', X.shape
 
     yi = np.copy(y)
      
     # revise y_labels for Leave One Out Analysis?
     yi[yi != 1] = 0
     #y_test[y_test != lo] = 0
-    clf = tree.DecisionTreeClassifier()#min_samples_leaf=10, min_samples_split=20)#, max_features=4)
+    
     X_train, X_test, y_train, y_test = train_test_split(
-        X, yi, train_size=.3, random_state=3)
+        X, yi, train_size=.6, random_state=3)#, stratify=yi)
+    print 'train:', X_train.shape
+    print 'test:', X_test.shape
+
     clf.fit(X_train, y_train)
     score = clf.score(X_test, y_test)
     print 'Initial Classifier score:', score
 
     print 'untuned louo'
     scores = analysis_classify_walkers_louo(clf, X, y)
+    print scores
     print scores.mean(), scores.std()
 
-    parameters = {
-        'max_features':[2,4,6,8,12,16],
-        'max_depth':[2,4,6,8],
-        'min_samples_leaf':[5,10,15,20],
-        'min_samples_split':[5,10,15,20]}
+    
     grid = grid_search.GridSearchCV(clf, parameters)
     grid.fit(X, yi)
 
@@ -1403,9 +1456,10 @@ def analysis_grid_tree(X, y):
     print
     print 'tuned louo'
     scores = analysis_classify_walkers_louo(clf, X, y, parms=grid.best_params_)
+    print scores 
     print scores.mean(), scores.std()
 
-    return scores
+    return clf #scores
 
 def compare_time_freq(data):
     datawalk = data[data.act==4]
@@ -1428,8 +1482,6 @@ def analysis_freq_tree(data):
     clf = tree.DecisionTreeClassifier()
     X, y = make_freq_features(walking_data)
 
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
     
     print 'Leave One User Out.'
     scores = analysis_classify_walkers_louo(clf, X, y)
@@ -1447,9 +1499,6 @@ def analysis_activity_time_tree(data):
     
     X, y = make_time_features(user_data, ycol=act, yrng=[2,4,6])
     
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
-    
     print 'Leave One User Out.'
     mn, sd = analysis_classify_walkers_louo(clf, X, y)
     print 'mean',mn, 'std', sd
@@ -1462,9 +1511,6 @@ def analysis_activity_freq_tree(data):
     clf = tree.DecisionTreeClassifier()
     X, y = make_freq_features(walking_data)
 
-    print 'Walker Classification.'
-    analysis_classify_walkers(clf, X, y)
-    
     print 'Leave One User Out.'
     mn, sd = analysis_classify_walkers_louo(clf, X, y)
     print 'mean',mn, 'std', sd
@@ -1517,9 +1563,10 @@ def exploratory_visualization(data_files):
     plt.show()
 
 if __name__=="__main__":
-    data = load_data(data_files)
+    pass
+    #data = load_data(data_files)
 
-    compare_time_freq(data)
+    #compare_time_freq(data)
     
 
 
