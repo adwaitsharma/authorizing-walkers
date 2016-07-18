@@ -199,21 +199,6 @@ def get_activity_segments(dat):
     return segment_list
 
 
-def filter_signal(x, ts=None, cutoff=5., fs=52., order=6, viz=0):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    xf = lfilter(b, a, x)
-    
-    if viz and ts is not None:
-        #t = np.linspace(0, len(x)/, len(x), endpoint=False)
-        plt.plot(ts, x, 'b-', label='data')
-        plt.plot(ts, xf, 'g-', label='filtered')
-        plt.xlabel('Time (s)')
-        plt.legend()
-        plt.show()
-
-
 def prepare_data(data_files, dim='xa', n_peaks=5, test_ratio=.3, 
     random_state=3):
     '''prepare data with train and test
@@ -310,46 +295,6 @@ def plt_psd_w_peaks(x, delta=10):
     for p in mn:
         plt.plot(p[0], p[1], 'ro')
     plt.show()
-
-
-def get_spec_peaks(dat, n_peaks=8, nFFT=128, fs=52, novr=0, nperseg=128):
-    '''returns spetrogram peaks for one time series'''
-
-
-    #sp = plt.specgram(dat, NFFT=nFFT, noverlap=novr)
-    f,t,Sxx = spectrogram(dat, fs=fs, nfft=nFFT, noverlap=novr, nperseg=nperseg)
-    #plt.show()
-    pk1 = []
-    pk2 = []
-    pks = []
-    for ti in range(t.shape[0]):
-        #p_ind = find_peaks(Sxx[:][t])
-        p_ind = find_peaks(Sxx[ti][:])
-        #print 'p_ind', p_ind
-        #print 'Sxx[x][:]', len(Sxx[t])
-        if len(p_ind) >= 2:
-            #p1, p2 = (dat.iloc[p_ind[0]], dat.iloc[p_ind[1]])
-            p1, p2 = (f[p_ind[0]], f[p_ind[1]])
-            pk1.append(p1)
-            pk2.append(p2)
-        #print len(p_ind), len(f)
-        
-        cur_peak_inds = p_ind[:n_peaks]
-        #while len(cur_peak_inds) < n_peaks:
-        #    cur_peak_inds.append(0)
-        #    print '.',
-        #print
-        pks.append([f[i] for i in p_ind[:n_peaks]])
-        #print len(pks[-1])
-    #print pk1
-    #print pk2
-    #plt.plot(pk1,pk2, '.')
-    #plt.show()
-
-    #return pk1, pk2
-    #pks = np.array(pks)
-    
-    return pks
 
 
 def plt_harmon(dat, nFFT=128, fs=52, novr=0, nperseg=128):
@@ -739,12 +684,11 @@ def plot_peaks(res):
     plt.show()
 
 
+def plot_all_peaks(data_files):
+    #nFFT = 128
+    results = peaks_for_all(data_files)
+    plot_peaks(results)
 
-def find_peaks_x(dat):
-    pks = np.arange(1,50)
-    p_ind = find_peaks_cwt(dat, pks)
-
-    return p_ind
 
 def adj_segs(segs, x):
     segs[0][2] += x
@@ -883,11 +827,6 @@ def split_data(Dat, subjects=None, actions=[3,4], test_ratio=0.3, X_coi=[], y_co
     #return X, y
     return X_train, y_train.astype(int), X_test, y_test.astype(int)
 
-
-def plot_all_peaks(data_files):
-    #nFFT = 128
-    results = peaks_for_all(data_files)
-    plot_peaks(results)
 
 def analysis_first(Dat):
     # First analysis as sanity check
