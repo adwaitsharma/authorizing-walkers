@@ -424,32 +424,6 @@ def time_feature_scatter(X):
     plt.show()
 
 
-def build_time_domain_data(data_files):
-    print 'stand alone function'
-    act_n = 4
-    X, y = np.empty([0,12]), np.empty([0,2])
-    for fn in data_files:
-        subj_n = int(os.path.basename(fn)[:-4])
-        print subj_n,
-        dat = load_file(fn, act=act_n)
-        rslt = extract_windowed_time_features(
-            dat.ya.as_matrix(), dat.ts.as_matrix(), 5, 25)
-        X = np.concatenate((X, rslt), 0)
-        #print rslt.shape
-        #act_col = np.array([[act_n]] * rslt.shape[0])
-        #subj_col = np.array([[subj_n]] * rslt.shape[0])
-        y_cols = np.array([[act_n, subj_n]] * rslt.shape[0])
-        y = np.concatenate((y, y_cols), 0)
-        #print act_col.shape
-        #print subj_col.shape
-        #rslt = np.concatenate((rslt, act_col, subj_col), 1)
-        #print rslt.shape
-        #print result.shape
-        #result = np.concatenate((result, rslt), 0)
-    print ''
-
-    return X, y
-
 def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp', jrk=1):
     #print ts.shape
     X = dat.as_matrix()
