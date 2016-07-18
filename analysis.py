@@ -450,32 +450,6 @@ def build_time_domain_data(data_files):
 
     return X, y
 
-def compute_time_domain_data(data, sig_col='ya', window_size=5, delta=25):
-    """not used?"""
-    act_n = 4
-    # there are 12 X features to compute and 2 labels
-    jrk = 1
-    if jrk:
-        X, y = np.empty([0,12]), np.empty([0,2])
-    else:
-        X, y = np.empty([0,6]), np.empty([0,2])
-
-    for s in subj_numbers:
-        #subj_n = int(os.path.basename(fn)[:-4])
-        print s,
-        subj_mask = data.subj.isin([s])
-        dat = data[subj_mask]
-        #dat = load_file(fn, act=act_n)
-        rslt = extract_windowed_time_features(
-            dat[sig_col].as_matrix(), dat.ts.as_matrix(), window_size, delta)
-        X = np.concatenate((X, rslt), 0)
-        
-        y_cols = np.array([[act_n, subj_n]] * rslt.shape[0])
-        y = np.concatenate((y, y_cols), 0)
-    print ''
-
-    return X, y
-
 def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp', jrk=1):
     #print ts.shape
     X = dat.as_matrix()
@@ -910,8 +884,7 @@ def analysis_svm(X_train, y_train, X_test, y_test):
     clf.fit(X_train, y_train)
 
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
-                        n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):#[50,100,150,200,300,400]) 
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):#[50,100,150,200,300,400]) 
 
     """
     Generate a simple plot of the test and traning learning curve.
@@ -1208,7 +1181,7 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=4,
 
     #subj_n = range(1,16)#[1]
     sig_comps = ['xa', 'ya', 'za']
-    n_sig = len(sig_comps)
+    #n_sig = len(sig_comps)
 
     # frequency domain features
     print "Extracting frequency features..."
@@ -1234,12 +1207,11 @@ def make_freq_features(data, nFFT=256, n_peaks=6, delta=4,
     return X, y
 
 
-def make_time_features(data, win_size=5, delta=40, 
-    yrng=range(1,16), ycol='subj', typ='amp', jrk=1): 
+def make_time_features(data, win_size=5, delta=40, yrng=range(1,16), ycol='subj', typ='amp', jrk=1): 
 
     #subj_n = range(1,16)#[1]
     sig_comps = ['xa', 'ya', 'za']
-    n_sig = len(sig_comps)
+    #n_sig = len(sig_comps)
 
     X = pd.DataFrame()
     y = np.array([])
