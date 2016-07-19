@@ -499,6 +499,10 @@ def compute_time_stats(x, ts, delta=25, typ='amp', jrk=1):
 
 
 def calculate_ts_diffs(x, ts, delta=25, viz=0):
+    '''Old version that computed temporal/periodicity differences in the 
+    signal.  This was a misinterpretation of the journal article.  But the 
+    code is being kept for reference.
+    '''
     #print "ts_diffs: x.shape:", x.shape
     #print "delta", delta
     mx, mn = peakdet(x, delta=delta)

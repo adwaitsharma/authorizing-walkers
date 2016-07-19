@@ -458,9 +458,10 @@ def make_time_features(data, win_size=5, delta=40, yrng=range(1,16), ycol='subj'
 
     return X, y
 
-'''
+
+'''*****************************************************************************
 Analyses
-'''
+*****************************************************************************'''
 
 def analysis_logistic_regression(data):
 
