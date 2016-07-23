@@ -4,6 +4,7 @@ import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from pandas.tools.plotting import scatter_matrix
 
 from scipy.stats import ttest_ind
 
@@ -374,23 +375,30 @@ def analysis_classify_walkers_louo(clf, X, y, parms={}):
     return scores #.mean(), scores.std()
 
 
-def plot_as_pca(X): #(X,y)
-    pca = PCA(n_components=2)
-    Xt = pca.fit_transform(X[0])
+def plot_as_pca(X,y):
+    pca = PCA(n_components=5)
+    Xt = pca.fit_transform(X)
     import six 
     from matplotlib import colors
     colors_ = list(six.iteritems(colors.cnames))
 
-    for i in range(1,6):
-        print i,
-        Xi = Xt[np.ravel(X[1]==i)]
-        Xc = np.ravel(X[1][np.ravel(X[1]==i)])
-        print Xc
-        print Xi.shape
+    if 0:#for i in range(1,3):
+        #print i,
+        Xi = Xt[np.ravel(y==i)]
+        Xc = np.ravel(y[np.ravel(y==i)])
+        #print Xc
+        #print Xi.shape
         #plt.scatter(Xi[:,0], Xi[:,1], c=Xc)#[i]*Xi[0].size)
-        plt.scatter(Xi[:,0], Xi[:,1], c=colors_[i])#[i]*Xi[0].size)
+        plt.scatter(Xi[:,4], Xi[:,2], c=colors_[i])#[i]*Xi[0].size)
 
-    plt.show()
+        plt.show()
+
+
+    Xtpd = pd.DataFrame(Xt)
+    Xtpd['y'] = y
+    scatter_matrix(Xtpd)#, alpha=0.2, figsize=(6, 6), diagonal='kde')
+
+    return Xtpd
 
 def plot_windowed_time_features(data_file, n, sig='ya', win_size=2):
     dat = load_data(data_file[n:n+1], act=4)
