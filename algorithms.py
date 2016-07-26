@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from sklearn.decomposition import PCA
 from sklearn.learning_curve import learning_curve
