@@ -705,6 +705,20 @@ def exploratory_visualization(data_files):
     acc_3a(dat[2000:2520])
     plt.show()
 
+
+def look_for_outliers(data_files):
+    datawalk = load_data(data_files, act=4, use_fix=False)
+    X, y = make_freq_features(datawalk, delta=40)
+
+    pca = PCA(n_components=5)
+    Xt = pca.fit_transform(X)
+
+    p = pd.DataFrame(Xt)
+    p['y'] = y
+
+    return p
+
+
 if __name__=="__main__":
     pass
     #data = load_data(data_files)

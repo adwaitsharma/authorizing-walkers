@@ -107,15 +107,21 @@ def peakdet(v, delta, x = None):
 # Helper functions
 #
 
-def load_file(file_path, act=None, col_names=col_names):
+def load_file(file_path, act=None, col_names=col_names, use_fix=True):
     '''reads file with appropriate header information'''
+    subject_number = lambda x: int(os.path.basename(x)[:-4])
+
     dat = pd.read_csv(file_path, 
         names=col_names, 
         usecols=['xa','ya','za','act'])
-    act_file = file_path[:-4] + '.txt'
-    act_dat = pd.read_csv(act_file, names=['act'])
-    dat['act'] = act_dat
     
+    # only use fixed labels if directed
+    if use_fix:
+        act_file = file_path[:-4] + '.txt'
+        act_dat = pd.read_csv(act_file, names=['act'])
+        dat['act'] = act_dat
+    
+    # filter by action if not None
     if act:
         dat = dat.loc[dat.act == act]
     
@@ -123,6 +129,10 @@ def load_file(file_path, act=None, col_names=col_names):
     dat['ts'] = ts
 
     dat['mag'] = signal_magnitude(dat)
+
+    # add subject column
+    subj_col = [subject_number(file_path)] * dat.shape[0]
+    dat['subj'] = subj_col
 
     return dat
 
@@ -138,8 +148,8 @@ def load_data(data_files, subjs=range(1,16), act=None, col_names=['ya']):
             d = load_file(f, act=act)
         else:
             d = load_file(f)
-        subj_col = [subject_number(f)] * d.shape[0]
-        d['subj'] = subj_col
+        #subj_col = [subject_number(f)] * d.shape[0]
+        #d['subj'] = subj_col
         data = data.append(d, ignore_index=True)
 
     return data
