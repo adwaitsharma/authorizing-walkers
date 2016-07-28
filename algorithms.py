@@ -137,7 +137,7 @@ def load_file(file_path, act=None, col_names=col_names, use_fix=True):
     return dat
 
 
-def load_data(data_files, subjs=range(1,16), act=None, col_names=['ya']):
+def load_data(data_files, subjs=range(1,16), act=None, col_names=['ya'], use_fix=True):
     subject_number = lambda x: int(os.path.basename(x)[:-4])
     data_files_selected = [i for i in data_files if subject_number(i) in subjs]
     
@@ -145,9 +145,9 @@ def load_data(data_files, subjs=range(1,16), act=None, col_names=['ya']):
     for i, f in enumerate(data_files_selected):
         print subject_number(f),
         if act:
-            d = load_file(f, act=act)
+            d = load_file(f, act=act, use_fix=use_fix)
         else:
-            d = load_file(f)
+            d = load_file(f, use_fix=use_fix)
         #subj_col = [subject_number(f)] * d.shape[0]
         #d['subj'] = subj_col
         data = data.append(d, ignore_index=True)

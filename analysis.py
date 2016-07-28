@@ -706,8 +706,11 @@ def exploratory_visualization(data_files):
     plt.show()
 
 
-def look_for_outliers(data_files):
+def show_outliers(data_files):
+    #using raw data
     datawalk = load_data(data_files, act=4, use_fix=False)
+
+    #print datawalk.head()
     X, y = make_freq_features(datawalk, delta=40)
 
     pca = PCA(n_components=5)
@@ -715,8 +718,60 @@ def look_for_outliers(data_files):
 
     p = pd.DataFrame(Xt)
     p['y'] = y
+    #print p.head()
+    p.iloc[:,:5].hist(layout=(1,5),  figsize=(9,3))
 
+    # using fixed activity labels
+    datawalk = load_data(data_files, act=4, use_fix=True)
+
+    #print datawalk.head()
+    X, y = make_freq_features(datawalk, delta=40)
+
+    pca = PCA(n_components=5)
+    Xt = pca.fit_transform(X)
+
+    p = pd.DataFrame(Xt)
+    p['y'] = y
+    #print p.head()
+    p.iloc[:,:5].hist(layout=(1,5),  figsize=(9,3))
+
+    plt.show()
     return p
+
+def show_misalignment(data_files):
+    dat = load_file(data_files[6], use_fix=False)
+
+    dat1 = dat[500*52:1501*52]
+    dat1 = dat1.reset_index(drop=True)
+    ns = dat1.shape[0]
+    ts = np.linspace(0, ns/52., num=ns)
+
+    plt.figure(figsize=(12,6))
+    ax = plt.subplot(111)
+    plt.plot(ts, dat1.xa, 'k')
+    plt.title('Raw Acceleration Data')
+    plt.ylabel('Acceleration')
+    plt.xlabel('Time (s)')
+    segs = get_activity_segments(dat1)
+    pltsegs(ax, segs)
+
+
+    dat1 = dat[46000:47000]
+    dat1 = dat1.reset_index(drop=True)
+    ns = dat1.shape[0]
+    ts = np.linspace(0, ns/52., num=ns)
+
+    plt.figure(figsize=(12,6))
+    ax = plt.subplot(111)
+    plt.plot(ts, dat1.xa, 'k')
+    plt.title('Raw Acceleration Data')
+    plt.ylabel('Acceleration')
+    plt.xlabel('Time (s)')
+    segs = get_activity_segments(dat1)
+    pltsegs(ax, segs)
+
+
+    plt.show()
 
 
 if __name__=="__main__":
