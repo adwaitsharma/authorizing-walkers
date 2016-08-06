@@ -13,6 +13,7 @@ from sklearn import svm
 from sklearn import tree
 from sklearn.linear_model import LogisticRegression
 
+from sklearn.mixture import GMM
 
 #
 # Get started!
@@ -470,6 +471,66 @@ def make_time_features(data, win_size=5, delta=40, yrng=range(1,16), ycol='subj'
 '''*****************************************************************************
 Analyses
 *****************************************************************************'''
+
+def analysis_clustering(data, n_clust=2):
+    #n_clust = 2
+
+    # make features
+    X, y = make_freq_features(data, delta=40)
+    #X, y = make_time_features(data, delta=40)
+
+    # pca reduction
+    pca = PCA(n_components=18)
+    Xt = pca.fit_transform(X)
+    if 0:
+        plt.figure()
+        plt.title('PCA freq features')
+        plt.plot(range(1,19), np.cumsum(pca.explained_variance_ratio_), 'o-')
+        plt.xlim(1,18)
+        plt.show()
+
+    pca = PCA(n_components=18)
+    Xt = pca.fit_transform(X)
+    
+    max_pct = []
+    clusts = range(2,16)
+    for n_clust in clusts:
+        # cluster into groups
+        clf = GMM(n_components=n_clust, covariance_type='full')
+        clf.fit(Xt)
+        y_pred = clf.predict(Xt)
+
+        # look at groups
+        counts = []
+        for c in range(n_clust):
+            inds = np.where(y_pred==c)
+            res = np.histogram(y[inds], bins=range(1,17))
+            #print res[0]
+            counts.append(res[0])
+
+        #for i in range(n_clust):
+        counts_tot = np.histogram(y, bins=range(1,17))[0]
+        counts_tot = [float(i) for i in counts_tot]
+        
+        #pcts = [i/counts_tot for i in counts]
+        pcts = [i/counts_tot*(a+2) for a,i in enumerate(counts)]
+        #print pcts
+        max_pct.append(np.max(pcts, 0))
+
+    #pct_dat = np.array(max_pct)
+    pct_dat = np.array(pcts) #what should this do?
+    plt.figure()
+    plt.plot(pct_dat.T)
+
+    avgs = pct_dat.mean(axis=1)
+    plt.figure()
+    plt.plot(clusts, avgs)
+
+
+    plt.show()
+
+    return counts, pct_dat
+
 
 def analysis_logistic_regression(data):
 
