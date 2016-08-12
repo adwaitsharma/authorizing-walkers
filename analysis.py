@@ -14,6 +14,7 @@ from sklearn import tree
 from sklearn.linear_model import LogisticRegression
 
 from sklearn.mixture import GMM
+from sklearn.cluster import KMeans
 
 #
 # Get started!
@@ -493,10 +494,11 @@ def analysis_clustering(data, n_clust=2):
     Xt = pca.fit_transform(X)
     
     max_pct = []
-    clusts = range(2,16)
+    clusts = range(3,16)
     for n_clust in clusts:
         # cluster into groups
-        clf = GMM(n_components=n_clust, covariance_type='full')
+        #clf = GMM(n_components=n_clust, covariance_type='full')
+        clf = KMeans(n_clusters=n_clust)
         clf.fit(Xt)
         y_pred = clf.predict(Xt)
 
@@ -517,13 +519,17 @@ def analysis_clustering(data, n_clust=2):
         #print pcts
         max_pct.append(np.max(pcts, 0))
 
-    #pct_dat = np.array(max_pct)
-    pct_dat = np.array(pcts) #what should this do?
+    pct_dat = np.array(max_pct)
+    #pct_dat = np.array(pcts) #what should this do?
     plt.figure()
     plt.plot(pct_dat.T)
 
+    #print pct_dat.shape
+    #print 
     avgs = pct_dat.mean(axis=1)
     plt.figure()
+    #print clusts
+    #print avgs
     plt.plot(clusts, avgs)
 
 
@@ -834,6 +840,26 @@ def show_misalignment(data_files):
     segs = get_activity_segments(dat1)
     pltsegs(ax, segs)
 
+
+    plt.show()
+
+def show_features_by_subject(data_files=data_files):
+    datawalk = load_data(data_files, act=4, use_fix=False)
+
+    #print datawalk.head()
+    X, y = make_freq_features(datawalk, delta=40)
+
+    pca = PCA(n_components=5)
+    Xt = pca.fit_transform(X)
+
+    p = pd.DataFrame(Xt)
+    p['Subject'] = y
+
+    axes = p.boxplot(by='Subject', layout=(1,5))
+
+    for i in range(5):
+        axes[i].set_title('PCA '+str(i))
+        axes[i].set_xlabel('')
 
     plt.show()
 
