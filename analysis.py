@@ -396,9 +396,9 @@ def plot_as_pca(X,y):
         plt.show()
 
 
-    Xtpd = pd.DataFrame(Xt)
+    Xtpd = pd.DataFrame(Xt, columns=['PCA '+str(i) for i in range(5)])
     Xtpd['y'] = y
-    scatter_matrix(Xtpd)#, alpha=0.2, figsize=(6, 6), diagonal='kde')
+    scatter_matrix(Xtpd, alpha=0.2, figsize=(6, 6), diagonal='kde')
 
     return Xtpd
 
