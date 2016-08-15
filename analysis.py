@@ -397,7 +397,7 @@ def plot_as_pca(X,y):
 
 
     Xtpd = pd.DataFrame(Xt, columns=['PCA '+str(i) for i in range(5)])
-    Xtpd['y'] = y
+    #Xtpd['y'] = y
     scatter_matrix(Xtpd, alpha=0.2, figsize=(6, 6), diagonal='kde')
 
     return Xtpd
@@ -675,19 +675,71 @@ def analysis_grid_tree(clf, parameters, X, y):
     return clf #scores
 
 def compare_time_freq(data):
+    pt = 0
+    clf = tree.DecisionTreeClassifier(class_weight='balanced', min_samples_leaf=10)#, min_samples_split=20)#, max_features=4)
+    parameters = {
+        'max_features':[3,4,5],
+        #'max_depth':[None, 2,3,4],
+        'min_samples_leaf':[1,2,3,4,5,10],
+        'min_samples_split':[2,3,4,5,10,15,20]}
+
+    
     datawalk = data[data.act==4]
     Xf, yf = make_freq_features(datawalk, delta=4)
-    scores_f = analysis_grid_tree(Xf, yf)
+    #scores_f = analysis_grid_tree(clf, parameters, Xf, yf)
 
-    print
-    print
+    Xt, yt = make_time_features(datawalk, win_size=4.923077, delta=40)   
+    #scores_t = analysis_grid_tree(clf, parameters, Xt, yt)
 
-    Xt, yt = make_time_features(datawalk, delta=40)   
-    scores_t = analysis_grid_tree(Xt, yt)
+    #print 'T-test comparing validation using time and frequency features'
+    #print ttest_ind(scores_f, scores_t)
+    #print scores_f, scores_t
+    #return scores_f, scores_t 
 
-    print 'T-test comparing validation using time and frequency features'
-    print ttest_ind(scores_f, scores_t)
-    return scores_f, scores_t 
+    # PCA freq
+    pca = PCA(n_components=18)
+    Xfp = pca.fit_transform(Xf)
+    if pt:
+        plt.figure()
+        plt.title('PCA freq features')
+        plt.plot(range(1,19), np.cumsum(pca.explained_variance_ratio_), 'o-')
+        plt.xlim(1,18)
+        plt.show()    
+
+    # PCA time
+    pca = PCA(n_components=36)
+    Xtp = pca.fit_transform(Xt)
+    if pt:
+        plt.figure()
+        plt.title('PCA time features')
+        plt.plot(range(1,37), np.cumsum(pca.explained_variance_ratio_), 'o-')
+        plt.xlim(1,18)
+        plt.show()  
+
+    # PCA combinded
+    Xall = np.hstack((Xf, Xt))
+    print 'combined features', Xall.shape
+    pca = PCA(n_components=54)
+    Xallp = pca.fit_transform(Xall)
+    if pt:
+        plt.figure()
+        plt.title('PCA freq and time features')
+        plt.plot(range(1,55), np.cumsum(pca.explained_variance_ratio_), 'o-')
+        plt.xlim(1,54)
+        plt.show()  
+
+    pca = PCA(n_components=5)
+    Xallp = pca.fit_transform(Xall)
+
+    p = pd.DataFrame(Xallp)
+    #p['y'] = y
+    #print p.head()
+    p.iloc[:,:5].hist(layout=(1,5),  figsize=(9,3))
+
+    plt.figure()
+    scatter_matrix(p, alpha=0.2, figsize=(6, 6), diagonal='kde')
+    plt.show()
+
 
 
 def analysis_freq_tree(data):

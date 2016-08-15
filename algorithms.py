@@ -424,6 +424,7 @@ def extract_windowed_time_features(dat, ts, win_size, delta, typ='amp', jrk=1):
     X = dat.as_matrix()
     
     win_size_samp = int(win_size/(ts[1]-ts[0]))
+    #print 'win_size_samp', win_size_samp
     n_wins = X.shape[0]/win_size_samp
 
     if jrk:
