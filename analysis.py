@@ -622,8 +622,10 @@ def run_analyses(X, y):
 
     clf = svm.SVC(class_weight='balanced')
     parameters = {
-        'C': [1, 10, 100, 1000], 
-        'gamma': [.1,.01, 0.001, 0.0001]}
+        'kernel':('linear', 'rbf', 'sigmoid'), 
+        'C':[0.1, 1, 10, 100], 
+        'gamma':[0.001, 0.1, 10, 100]}
+
     clf = analysis_grid_tree(clf, parameters, X, y)
 
     return clf
