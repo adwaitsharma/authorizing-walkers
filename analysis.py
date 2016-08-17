@@ -620,16 +620,15 @@ def run_analyses(X, y):
     print
     print
 
-    clf = svm.SVC(class_weight='balanced')
+    clf = svm.SVC(gamma=1, class_weight='balanced')
     parameters = {
         'kernel':('linear', 'rbf', 'sigmoid'), 
-        'C':[0.1, 1, 10, 100], 
-        'gamma':[0.001, 0.1, 10, 100]}
+        'C':[0.1, 1., 10., 100.], 
+        'gamma':[0.001, 0.1, 1., 10., 100.]}
 
     clf = analysis_grid_tree(clf, parameters, X, y)
 
     return clf
-
 
 
 def analysis_grid_tree(clf, parameters, X, y):
@@ -647,8 +646,18 @@ def analysis_grid_tree(clf, parameters, X, y):
         X, yi, train_size=.6, random_state=3)#, stratify=yi)
     print 'train:', X_train.shape
     print 'test:', X_test.shape
-
+    
+    # Fit
+    t = time.time()
     clf.fit(X_train, y_train)
+    print 'Fit time:', time.time() - t
+
+    # Predict
+    t = time.time()
+    clf.predict(X_test)
+    print 'Predict time:', time.time() - t
+
+    # Score
     score = clf.score(X_test, y_test)
     print 'Initial Classifier score:', score
 
@@ -657,16 +666,23 @@ def analysis_grid_tree(clf, parameters, X, y):
     print scores
     print scores.mean(), scores.std()
 
-    
+    print '* Grid Search *'
     grid = grid_search.GridSearchCV(clf, parameters)
+    # Fit tuned
+    t = time.time()
     grid.fit(X, yi)
+    print 'Fit time:', time.time() - t
 
+    # Predict tuned
+    t = time.time()
+    grid.predict(X_test)
+    print 'Predict time', time.time() - t 
 
+    # Score tuned
     print 'grid search'
     print grid.best_score_
     print grid.best_estimator_
 
-    
 
     print
     print 'tuned louo'
@@ -675,6 +691,7 @@ def analysis_grid_tree(clf, parameters, X, y):
     print scores.mean(), scores.std()
 
     return clf #scores
+
 
 def compare_time_freq(data):
     pt = 0
