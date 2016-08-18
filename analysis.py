@@ -608,12 +608,11 @@ def analysis_tree(X,y):
     return clf
 
 def run_analyses(X, y):
-    clf = tree.DecisionTreeClassifier(class_weight='balanced', min_samples_leaf=10)#, min_samples_split=20)#, max_features=4)
+    clf = tree.DecisionTreeClassifier(class_weight='balanced', max_depth=5, min_samples_leaf=5)#, min_samples_split=20)#, max_features=4)
     parameters = {
-        'max_features':[3,4,5],
-        #'max_depth':[None, 2,3,4],
-        'min_samples_leaf':[1,2,3,4,5,10],
-        'min_samples_split':[2,3,4,5,10,15,20]}
+        'max_features': [3,4,5,6,7,8],
+        'max_depth': [5,10,15,20],
+        'min_samples_leaf': [3,4,5,6,7,8,9]}
 
     analysis_grid_tree(clf, parameters, X, y)
 
@@ -622,9 +621,9 @@ def run_analyses(X, y):
 
     clf = svm.SVC(gamma=1, class_weight='balanced')
     parameters = {
-        'kernel':('linear', 'rbf', 'sigmoid'), 
-        'C':[0.1, 1., 10., 100.], 
-        'gamma':[0.001, 0.1, 1., 10., 100.]}
+        'kernel': ('linear', 'rbf', 'sigmoid'), 
+        'C': [0.1, 1., 10., 100.], 
+        'gamma': [0.001, 0.1, 1., 10., 100.]}
 
     clf = analysis_grid_tree(clf, parameters, X, y)
 
