@@ -879,6 +879,7 @@ def show_outliers(data_files):
     return p
 
 def show_misalignment(data_files):
+    # pre alignment fix
     dat = load_file(data_files[6], use_fix=False)
 
     dat1 = dat[500*52:1501*52]
@@ -887,15 +888,32 @@ def show_misalignment(data_files):
     ts = np.linspace(0, ns/52., num=ns)
 
     plt.figure(figsize=(12,6))
-    ax = plt.subplot(111)
+    ax1 = plt.subplot(111)
     plt.plot(ts, dat1.xa, 'k')
     plt.title('Raw Acceleration Data')
     plt.ylabel('Acceleration')
     plt.xlabel('Time (s)')
     segs = get_activity_segments(dat1)
-    pltsegs(ax, segs)
+    pltsegs(ax1, segs)
 
+    # use fixed activity labels
+    dat = load_file(data_files[6])
 
+    dat1 = dat[500*52:1501*52]
+    dat1 = dat1.reset_index(drop=True)
+    ns = dat1.shape[0]
+    ts = np.linspace(0, ns/52., num=ns)
+
+    plt.figure(figsize=(12,6))
+    ax2 = plt.subplot(111)
+    plt.plot(ts, dat1.xa, 'k')
+    plt.title('Raw Acceleration Data with Fixed Labels')
+    plt.ylabel('Acceleration')
+    plt.xlabel('Time (s)')
+    segs = get_activity_segments(dat1)
+    pltsegs(ax2, segs)
+
+    # show aperiodic section
     dat1 = dat[46000:47000]
     dat1 = dat1.reset_index(drop=True)
     ns = dat1.shape[0]
@@ -910,8 +928,8 @@ def show_misalignment(data_files):
     segs = get_activity_segments(dat1)
     pltsegs(ax, segs)
 
-
     plt.show()
+
 
 def show_features_by_subject(data_files=data_files):
     datawalk = load_data(data_files, act=4, use_fix=False)
