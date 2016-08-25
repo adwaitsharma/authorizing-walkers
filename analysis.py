@@ -749,7 +749,8 @@ def compare_time_freq(data):
     pca = PCA(n_components=5)
     Xallp = pca.fit_transform(Xall)
 
-    p = pd.DataFrame(Xallp)
+    #pd.DataFrame(Xt, columns=['PCA '+str(i) for i in range(5)])
+    p = pd.DataFrame(Xallp, columns=['PCA '+str(i) for i in range(5)])
     #p['y'] = y
     #print p.head()
     p.iloc[:,:5].hist(layout=(1,5),  figsize=(9,3))
