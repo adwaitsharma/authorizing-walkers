@@ -704,10 +704,14 @@ def compare_time_freq(data):
     
     datawalk = data[data.act==4]
     Xf, yf = make_freq_features(datawalk, delta=4)
-    #scores_f = analysis_grid_tree(clf, parameters, Xf, yf)
+    print ''
+    print ' * GridTreee Freq factors'
+    scores_f = analysis_grid_tree(clf, parameters, Xf, yf)
 
     Xt, yt = make_time_features(datawalk, win_size=4.923077, delta=40)   
-    #scores_t = analysis_grid_tree(clf, parameters, Xt, yt)
+    print ''
+    print ' * GridTreee Time factors'
+    scores_t = analysis_grid_tree(clf, parameters, Xt, yt)
 
     #print 'T-test comparing validation using time and frequency features'
     #print ttest_ind(scores_f, scores_t)
@@ -736,6 +740,9 @@ def compare_time_freq(data):
 
     # PCA combinded
     Xall = np.hstack((Xf, Xt))
+    print ''
+    print ''
+    
     print 'combined features', Xall.shape
     pca = PCA(n_components=54)
     Xallp = pca.fit_transform(Xall)
@@ -748,8 +755,16 @@ def compare_time_freq(data):
 
     pca = PCA(n_components=5)
     Xallp = pca.fit_transform(Xall)
+    print ''
+    print ' * GridTreee combined factors'
+    scores_a = analysis_grid_tree(clf, parameters, Xallp, yt) # labels are same
+    print "scores freq"
+    print scores_f
+    print "scores time"
+    print scores_t
+    print "scores all"
+    print scores_a
 
-    #pd.DataFrame(Xt, columns=['PCA '+str(i) for i in range(5)])
     p = pd.DataFrame(Xallp, columns=['PCA '+str(i) for i in range(5)])
     #p['y'] = y
     #print p.head()
