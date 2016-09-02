@@ -692,26 +692,26 @@ def analysis_grid_tree(clf, parameters, X, y):
     return clf #scores
 
 
-def compare_time_freq(data):
+def analysis_by_features(Xf, yf):
     pt = 0
     clf = tree.DecisionTreeClassifier(class_weight='balanced', min_samples_leaf=10)#, min_samples_split=20)#, max_features=4)
     parameters = {
+        'max_features':[3,4,5,6,7,8],
+        #'max_depth':[None, 2,3,4],
+        'min_samples_leaf':[1,2,3,4,5,10],
+        'min_samples_split':[2,3,4,5,10,15,20]}
+    parameters_pca = {
         'max_features':[3,4,5],
         #'max_depth':[None, 2,3,4],
         'min_samples_leaf':[1,2,3,4,5,10],
         'min_samples_split':[2,3,4,5,10,15,20]}
 
     
-    datawalk = data[data.act==4]
-    Xf, yf = make_freq_features(datawalk, delta=4)
+    #datawalk = data[data.act==4]
+    #Xf, yf = make_freq_features(datawalk, delta=4)
     print ''
     print ' * GridTreee Freq factors'
     scores_f = analysis_grid_tree(clf, parameters, Xf, yf)
-
-    Xt, yt = make_time_features(datawalk, win_size=4.923077, delta=40)   
-    print ''
-    print ' * GridTreee Time factors'
-    scores_t = analysis_grid_tree(clf, parameters, Xt, yt)
 
     #print 'T-test comparing validation using time and frequency features'
     #print ttest_ind(scores_f, scores_t)
@@ -719,8 +719,15 @@ def compare_time_freq(data):
     #return scores_f, scores_t 
 
     # PCA freq
-    pca = PCA(n_components=18)
+    print ''
+    print ' * Freq PCA'
+    pca = PCA(n_components=5)
     Xfp = pca.fit_transform(Xf)
+    print Xfp.shape
+    print parameters_pca
+    clf = tree.DecisionTreeClassifier(class_weight='balanced', min_samples_leaf=10)#, min_samples_split=20)#, max_features=4)
+    scores_fpca = analysis_grid_tree(clf, parameters_pca, Xfp, yf)
+    
     if pt:
         plt.figure()
         plt.title('PCA freq features')
@@ -728,9 +735,18 @@ def compare_time_freq(data):
         plt.xlim(1,18)
         plt.show()    
 
+
+def analysis_time(Xt, yt):
+    # Time Features
+    #Xt, yt = make_time_features(datawalk, win_size=4.923077, delta=40)   
+    print ''
+    print ' * GridTreee Time factors'
+    scores_t = analysis_grid_tree(clf, parameters, Xt, yt)
+
     # PCA time
-    pca = PCA(n_components=36)
+    pca = PCA(n_components=5)
     Xtp = pca.fit_transform(Xt)
+    scores_tpca = analysis_grid_tree(clf, parameters_pca, Xtp, yt)
     if pt:
         plt.figure()
         plt.title('PCA time features')
@@ -744,6 +760,8 @@ def compare_time_freq(data):
     print ''
     
     print 'combined features', Xall.shape
+    scores_a = analysis_grid_tree(clf, parameters, Xall, yt) # labels are same
+    
     pca = PCA(n_components=54)
     Xallp = pca.fit_transform(Xall)
     if pt:
@@ -757,7 +775,7 @@ def compare_time_freq(data):
     Xallp = pca.fit_transform(Xall)
     print ''
     print ' * GridTreee combined factors'
-    scores_a = analysis_grid_tree(clf, parameters, Xallp, yt) # labels are same
+    scores_apca = analysis_grid_tree(clf, parameters_pca, Xallp, yt) # labels are same
     print "scores freq"
     print scores_f
     print "scores time"
