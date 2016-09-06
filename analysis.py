@@ -625,7 +625,7 @@ def run_analyses(X, y):
         'C': [0.1, 1., 10., 100.], 
         'gamma': [0.001, 0.1, 1., 10., 100.]}
 
-    clf = analysis_grid_tree(clf, parameters, X, y)
+    #clf = analysis_grid_tree(clf, parameters, X, y)
 
     return clf
 
@@ -689,11 +689,20 @@ def analysis_grid_tree(clf, parameters, X, y):
     print scores 
     print scores.mean(), scores.std()
 
+    plt.figure()
+    plt.bar(range(1,len(scores)+1),scores, align='center')
+    plt.ylim((.8,1))
+    plt.xlabel('Subject')
+    plt.ylabel('F1 Score')
+    plt.xticks(np.arange(1, 16))
+
+    plt.show()
+
     return clf #scores
 
 
 def analysis_by_features(Xf, yf):
-    pt = 0
+    pt = 1
     clf = tree.DecisionTreeClassifier(class_weight='balanced', min_samples_leaf=10)#, min_samples_split=20)#, max_features=4)
     parameters = {
         'max_features':[3,4,5,6,7,8],
@@ -711,7 +720,7 @@ def analysis_by_features(Xf, yf):
     #Xf, yf = make_freq_features(datawalk, delta=4)
     print ''
     print ' * GridTreee Freq factors'
-    scores_f = analysis_grid_tree(clf, parameters, Xf, yf)
+    #scores_f = analysis_grid_tree(clf, parameters, Xf, yf)
 
     #print 'T-test comparing validation using time and frequency features'
     #print ttest_ind(scores_f, scores_t)
@@ -721,7 +730,7 @@ def analysis_by_features(Xf, yf):
     # PCA freq
     print ''
     print ' * Freq PCA'
-    pca = PCA(n_components=5)
+    pca = PCA(n_components=36)
     Xfp = pca.fit_transform(Xf)
     print Xfp.shape
     print parameters_pca
@@ -730,9 +739,9 @@ def analysis_by_features(Xf, yf):
     
     if pt:
         plt.figure()
-        plt.title('PCA freq features')
-        plt.plot(range(1,19), np.cumsum(pca.explained_variance_ratio_), 'o-')
-        plt.xlim(1,18)
+        plt.title('PCA Time features')
+        plt.plot(range(36), np.cumsum(pca.explained_variance_ratio_), 'o-')
+        plt.xlim(1,36)
         plt.show()    
 
 
@@ -987,10 +996,16 @@ def show_features_by_subject(data_files=data_files):
 
 
 if __name__=="__main__":
-    pass
-    #data = load_data(data_files)
+    #pass
+    data = load_data(data_files)
+    datawalk = data[data.act==4]
+    
+    Xt, yt = make_time_features(datawalk, win_size=4.923077)
+    Xf, yf = make_freq_features(datawalk, delta=40)
+    
+    run_analyses(Xt, yt)
+    run_analyses(Xf, yf)
 
-    #compare_time_freq(data)
     
 
 
