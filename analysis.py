@@ -26,6 +26,19 @@ col_names = ['ts','xa','ya','za','act']
 xyz = ['xa','ya','za']
 
 
+# the classifiers to be used and their corresponding parameter set for GridSearchCV
+classifier_sets = [
+(tree.DecisionTreeClassifier(class_weight='balanced', max_depth=5, min_samples_leaf=5),
+    {'max_features': [3,4,5,6,7,8],
+     'max_depth': [2,4,6,8],
+     'min_samples_leaf': [3,4,5,6,7,8,9]}),
+(svm.SVC(gamma=1, class_weight='balanced'),
+    {'kernel': ('linear', 'rbf', 'sigmoid'), 
+     'C': [0.1, 1., 10., 100.], 
+     'gamma': [0.001, 0.1, 1., 10., 100.]}),
+(LogisticRegression(class_weight='balanced'),
+    {'C': [.001,.01,.1,1,10,100,1000]})]
+
 
 
 def analysis_first(Dat):
@@ -602,10 +615,9 @@ def analysis_tree(X,y):
     #print 'Leave One User Out.'
     #mn, sd = analysis_classify_walkers_louo(clf, X, y)
     #print 'mean',mn, 'std', sd
-    
-
 
     return clf
+
 
 def run_analyses(X, y):
     clf = tree.DecisionTreeClassifier(class_weight='balanced', max_depth=5, min_samples_leaf=5)#, min_samples_split=20)#, max_features=4)
@@ -630,14 +642,14 @@ def run_analyses(X, y):
     return clf
 
 
-def analysis_grid_tree(clf, parameters, X, y):
+def analysis_grid_and_verify(clf, parameters, X, y):
     """
     """
     print 'data:', X.shape
 
     yi = np.copy(y)
      
-    # revise y_labels for Leave One Out Analysis?
+    # revise y_labels for Leave One Out Analysis
     yi[yi != 1] = 0
     #y_test[y_test != lo] = 0
     
@@ -802,7 +814,6 @@ def analysis_time(Xt, yt):
     plt.show()
 
 
-
 def analysis_freq_tree(data):
     walking_data = data[data.act==4]
     clf = tree.DecisionTreeClassifier()
@@ -812,9 +823,6 @@ def analysis_freq_tree(data):
     print 'Leave One User Out.'
     scores = analysis_classify_walkers_louo(clf, X, y)
     print 'mean',mn, 'std', sd
-
-
-
 
 
 ''' activity classification'''
@@ -921,6 +929,7 @@ def show_outliers(data_files):
     plt.show()
     return p
 
+
 def show_misalignment(data_files):
     # pre alignment fix
     dat = load_file(data_files[6], use_fix=False)
@@ -1003,9 +1012,17 @@ if __name__=="__main__":
     Xt, yt = make_time_features(datawalk, win_size=4.923077)
     Xf, yf = make_freq_features(datawalk, delta=40)
     
-    run_analyses(Xt, yt)
-    run_analyses(Xf, yf)
+    for clf, parms in classifier_sets:
+        print ''
+        print 'Frequency Domain features'
+        print ''
+        analysis_grid_and_verify(clf, parms, Xf, yf)
+        print ''
+        print 'Time Domain features'
+        print ''
+        analysis_grid_and_verify(clf, parms, Xt, yt)
+        print ''
+        print ''
+        print ''
 
     
-
-
